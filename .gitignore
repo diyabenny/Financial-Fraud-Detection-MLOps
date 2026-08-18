@@ -216,3 +216,25 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# Fraud Detection MLOps project files
+
+# Local dataset - do NOT upload to GitHub
+data/raw/
+data/processed/
+data/features/
+
+# AWS credentials / secrets
+*.pem
+*.key
+
+# Local logs
+logs/
+*.log
+
+# Local model artifacts
+models/
+
+# VS Code
+.vscode/
