@@ -238,3 +238,5 @@ models/
 
 # VS Code
 .vscode/
+
+.env
