@@ -44,6 +44,18 @@ print("End:", df["TX_DATETIME"].max())
 # ============================================================
 # 3. CHRONOLOGICAL TRAIN / TEST SPLIT
 # ============================================================
+#
+# Phase 1 baseline split:
+# Training: TX_TIME_DAYS 0–24
+# Testing:  TX_TIME_DAYS 25–29 and 49
+#
+# This is the initial chronological split used for the
+# Phase 1 baseline evaluation. It should not be interpreted
+# as a complete April-versus-May dataset split.
+#
+# The Phase 1 baseline methodology and results are retained
+# unchanged for comparison with models developed in later phases.
+# ============================================================
 
 train_days = list(range(0, 25))
 test_days = list(range(25, 30)) + [49]
@@ -294,6 +306,21 @@ print("\nBaseline model evaluation completed.")
 # ============================================================
 
 """
+PHASE 1 BASELINE DATA SPLIT
+
+The Phase 1 baseline used an initial chronological split based
+on TX_TIME_DAYS. Transactions from days 0–24 were used for
+training, while transactions from days 25–29 and day 49 were
+used for testing.
+
+This was the initial Phase 1 baseline evaluation and should
+not be interpreted as a complete April-versus-May dataset split.
+
+The Phase 1 baseline methodology and results are retained
+unchanged as the official baseline reference for comparison
+with models developed in later phases.
+
+
 BASELINE FINDINGS
 
 The original Logistic Regression baseline achieved:
