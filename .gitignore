@@ -225,6 +225,9 @@ data/raw/
 data/processed/
 data/features/
 
+# Phase 2 incoming datasets
+data/incoming/
+
 # AWS credentials / secrets
 *.pem
 *.key
