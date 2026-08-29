@@ -7,7 +7,15 @@ import pandas as pd
 
 
 # S3 configuration
-BUCKET_NAME = "financial-fraud-mlops-avani-2026"
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+
+if not BUCKET_NAME:
+    raise ValueError("S3_BUCKET_NAME is not set")
 
 DATASETS = {
     "april": "raw/april/converted_april_file.csv",
