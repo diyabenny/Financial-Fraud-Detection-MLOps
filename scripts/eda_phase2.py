@@ -1,14 +1,20 @@
 import io
+import os
 from pathlib import Path
 
 import boto3
 import matplotlib.pyplot as plt
 import pandas as pd
-
-
-# S3 configuration
-import os
 from dotenv import load_dotenv
+
+
+# ============================================================
+# PHASE 2.2 - EXPLORATORY DATA ANALYSIS
+# ============================================================
+
+# ------------------------------------------------------------
+# S3 Configuration
+# ------------------------------------------------------------
 
 load_dotenv()
 
@@ -17,24 +23,71 @@ BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 if not BUCKET_NAME:
     raise ValueError("S3_BUCKET_NAME is not set")
 
+
 DATASETS = {
     "april": "raw/april/converted_april_file.csv",
     "may": "raw/may/converted_may_file.csv",
 }
 
-# Output directory
+
+# ------------------------------------------------------------
+# Output Configuration
+# ------------------------------------------------------------
+
 BASE_OUTPUT_DIR = Path("reports/eda")
 
 
-def load_dataset(s3, key):
-    """Read a CSV file directly from S3."""
-    response = s3.get_object(Bucket=BUCKET_NAME, Key=key)
-    return pd.read_csv(io.BytesIO(response["Body"].read()))
+# ============================================================
+# Load Dataset
+# ============================================================
 
+def load_dataset(s3, key):
+    """
+    Load a CSV transaction dataset directly from Amazon S3.
+
+    Args:
+        s3: Boto3 S3 client used to access the bucket.
+        key (str): S3 object key of the CSV dataset.
+
+    Returns:
+        pandas.DataFrame: Transaction dataset loaded from S3.
+
+    Raises:
+        botocore.exceptions.ClientError: If the S3 object
+            cannot be retrieved.
+        pandas.errors.ParserError: If the CSV cannot be parsed.
+    """
+    response = s3.get_object(
+        Bucket=BUCKET_NAME,
+        Key=key
+    )
+
+    return pd.read_csv(
+        io.BytesIO(response["Body"].read())
+    )
+
+
+# ============================================================
+# Basic Information
+# ============================================================
 
 def basic_information(df, output_dir):
-    """Generate basic dataset information."""
+    """
+    Generate basic information about the transaction dataset.
 
+    The analysis includes dataset size, column names, data types,
+    missing values, duplicate rows, and duplicate transaction IDs.
+    The results are saved as CSV files in the specified output
+    directory.
+
+    Args:
+        df (pandas.DataFrame): Transaction dataset to analyze.
+        output_dir (Path): Directory where analysis results
+            are saved.
+
+    Returns:
+        None: Results are printed and saved to CSV files.
+    """
     print("\n--- Basic Information ---")
     print("Rows:", len(df))
     print("Columns:", len(df.columns))
@@ -99,9 +152,26 @@ def basic_information(df, output_dir):
     )
 
 
-def date_analysis(df, output_dir):
-    """Analyze transaction date and time information."""
+# ============================================================
+# Date Analysis
+# ============================================================
 
+def date_analysis(df, output_dir):
+    """
+    Analyze transaction date and time information.
+
+    The analysis identifies the earliest and latest transaction
+    dates and the minimum and maximum TX_TIME_DAYS values.
+    The results are saved as a CSV file.
+
+    Args:
+        df (pandas.DataFrame): Transaction dataset to analyze.
+        output_dir (Path): Directory where analysis results
+            are saved.
+
+    Returns:
+        None: Results are printed and saved to a CSV file.
+    """
     df = df.copy()
     df["TX_DATETIME"] = pd.to_datetime(df["TX_DATETIME"])
 
@@ -137,9 +207,27 @@ def date_analysis(df, output_dir):
     )
 
 
-def fraud_analysis(df, output_dir):
-    """Analyze fraud distribution and fraud scenarios."""
+# ============================================================
+# Fraud Analysis
+# ============================================================
 
+def fraud_analysis(df, output_dir):
+    """
+    Analyze fraud distribution and fraud scenarios.
+
+    The analysis calculates the number and percentage of normal
+    and fraudulent transactions and examines the distribution
+    of fraud scenarios. Corresponding CSV files and plots are
+    saved in the specified output directory.
+
+    Args:
+        df (pandas.DataFrame): Transaction dataset to analyze.
+        output_dir (Path): Directory where analysis results
+            and plots are saved.
+
+    Returns:
+        None: Results are printed and saved to CSV and image files.
+    """
     fraud_counts = df["TX_FRAUD"].value_counts().sort_index()
 
     fraud_percentage = df["TX_FRAUD"].mean() * 100
@@ -212,9 +300,26 @@ def fraud_analysis(df, output_dir):
     plt.close()
 
 
-def amount_analysis(df, output_dir):
-    """Analyze transaction amounts."""
+# ============================================================
+# Transaction Amount Analysis
+# ============================================================
 
+def amount_analysis(df, output_dir):
+    """
+    Analyze transaction amount statistics and distributions.
+
+    The analysis calculates minimum, mean, median, and maximum
+    transaction amounts and compares transaction amounts by
+    fraud status. Histograms and boxplots are also generated.
+
+    Args:
+        df (pandas.DataFrame): Transaction dataset to analyze.
+        output_dir (Path): Directory where analysis results
+            and plots are saved.
+
+    Returns:
+        None: Results are printed and saved to CSV and image files.
+    """
     print("\n--- Transaction Amount Statistics ---")
 
     amount_statistics = pd.DataFrame({
@@ -282,9 +387,9 @@ def amount_analysis(df, output_dir):
 
     plt.figure()
     plt.boxplot(
-    [normal_amounts, fraud_amounts],
-    tick_labels=["Normal", "Fraud"]
-)
+        [normal_amounts, fraud_amounts],
+        tick_labels=["Normal", "Fraud"]
+    )
     plt.title("Transaction Amount by Fraud Status")
     plt.xlabel("Fraud Status")
     plt.ylabel("Transaction Amount")
@@ -295,9 +400,22 @@ def amount_analysis(df, output_dir):
     plt.close()
 
 
-def customer_terminal_analysis(df, output_dir):
-    """Analyze customers and terminals."""
+# ============================================================
+# Customer and Terminal Analysis
+# ============================================================
 
+def customer_terminal_analysis(df, output_dir):
+    """
+    Analyze the number of unique customers and terminals.
+
+    Args:
+        df (pandas.DataFrame): Transaction dataset to analyze.
+        output_dir (Path): Directory where analysis results
+            are saved.
+
+    Returns:
+        None: Results are printed and saved to a CSV file.
+    """
     unique_customers = df["CUSTOMER_ID"].nunique()
     unique_terminals = df["TERMINAL_ID"].nunique()
 
@@ -322,9 +440,26 @@ def customer_terminal_analysis(df, output_dir):
     )
 
 
-def daily_analysis(df, output_dir):
-    """Analyze daily transaction and fraud activity."""
+# ============================================================
+# Daily Analysis
+# ============================================================
 
+def daily_analysis(df, output_dir):
+    """
+    Analyze daily transaction activity and fraud activity.
+
+    The analysis calculates the total number of transactions,
+    fraudulent transactions, and fraud percentage for each day.
+    Daily transaction and fraud activity plots are also generated.
+
+    Args:
+        df (pandas.DataFrame): Transaction dataset to analyze.
+        output_dir (Path): Directory where analysis results
+            and plots are saved.
+
+    Returns:
+        None: Results are printed and saved to CSV and image files.
+    """
     df = df.copy()
     df["TX_DATETIME"] = pd.to_datetime(df["TX_DATETIME"])
     df["DATE"] = df["TX_DATETIME"].dt.date
@@ -385,9 +520,26 @@ def daily_analysis(df, output_dir):
     plt.close()
 
 
-def correlation_analysis(df, output_dir):
-    """Calculate exploratory numerical correlations."""
+# ============================================================
+# Correlation Analysis
+# ============================================================
 
+def correlation_analysis(df, output_dir):
+    """
+    Calculate correlations between selected numerical variables.
+
+    The analysis examines the relationship between transaction
+    amount, transaction time, transaction days, and fraud status.
+    The resulting correlation matrix is saved as a CSV file.
+
+    Args:
+        df (pandas.DataFrame): Transaction dataset to analyze.
+        output_dir (Path): Directory where the correlation
+            matrix is saved.
+
+    Returns:
+        None: The correlation matrix is printed and saved to CSV.
+    """
     correlation_columns = [
         "TX_AMOUNT",
         "TX_TIME_SECONDS",
@@ -407,7 +559,28 @@ def correlation_analysis(df, output_dir):
     )
 
 
+# ============================================================
+# Main
+# ============================================================
+
 def main():
+    """
+    Run the Phase 2.2 exploratory data analysis workflow.
+
+    The workflow loads the April and May transaction datasets
+    from S3 and performs basic information, date, fraud,
+    transaction amount, customer and terminal, daily activity,
+    and correlation analyses. Results are saved under the
+    reports/eda directory.
+
+    Returns:
+        None: EDA results are printed and saved to files.
+
+    Raises:
+        ValueError: If S3_BUCKET_NAME is not configured.
+        botocore.exceptions.ClientError: If an S3 dataset
+            cannot be retrieved.
+    """
     s3 = boto3.client("s3")
 
     for dataset_name, s3_key in DATASETS.items():
