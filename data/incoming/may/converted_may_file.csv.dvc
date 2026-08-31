@@ -1,0 +1,5 @@
+outs:
+- md5: 57b63556432d03ae1d6848c33099202e
+  size: 10509756
+  hash: md5
+  path: converted_may_file.csv

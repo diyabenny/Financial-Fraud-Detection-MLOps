@@ -1,0 +1,4 @@
+[core]
+    remote = dvc-storage
+['remote "dvc-storage"']
+    url = s3://financial-fraud-mlops-avani-2026/dvc-storage/
