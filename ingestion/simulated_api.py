@@ -1,7 +1,5 @@
 import io
 import os
-from pathlib import Path
-
 import boto3
 import pandas as pd
 from botocore.exceptions import BotoCoreError, ClientError
@@ -34,7 +32,12 @@ REQUIRED_COLUMNS = [
 
 
 def validate_configuration():
-    """Check that the S3 bucket is configured."""
+    """
+    Check that the S3 bucket is configured.
+
+    Raises:
+        ValueError: If S3_BUCKET_NAME is not configured.
+    """
 
     if not BUCKET_NAME:
         raise ValueError(
@@ -42,11 +45,46 @@ def validate_configuration():
         )
 
 
-def read_source_from_s3():
-    """Read the original May CSV directly from S3."""
+def validate_file_format(s3_key):
+    """
+    Validate that the incoming S3 file uses the supported CSV format.
 
-    print(f"Reading source from S3:")
+    Args:
+        s3_key (str): S3 object key of the incoming file.
+
+    Returns:
+        bool: True when the file has a CSV extension.
+
+    Raises:
+        ValueError: If the incoming file is not a CSV file.
+    """
+
+    if not s3_key.lower().endswith(".csv"):
+        raise ValueError(
+            f"Unsupported file format: {s3_key}. "
+            "Only CSV files are supported."
+        )
+
+    print("[OK] File format: CSV")
+
+    return True
+
+
+def read_source_from_s3():
+    """
+    Read the source CSV file directly from Amazon S3.
+
+    Returns:
+        pandas.DataFrame: Data loaded from the S3 CSV object.
+
+    Raises:
+        ValueError: If the file format is unsupported or the file is empty.
+        RuntimeError: If the S3 object cannot be retrieved.
+    """
+    print("Reading source from S3:")
     print(f"  s3://{BUCKET_NAME}/{SOURCE_S3_KEY}")
+
+    validate_file_format(SOURCE_S3_KEY)
 
     try:
         s3 = boto3.client("s3")
@@ -61,9 +99,6 @@ def read_source_from_s3():
         if not file_content:
             raise ValueError("The S3 file is empty.")
 
-        if not SOURCE_S3_KEY.lower().endswith(".csv"):
-            raise ValueError("The source file is not a CSV file.")
-
         df = pd.read_csv(io.BytesIO(file_content))
 
         print(f"Successfully read {len(df)} rows from S3.")
@@ -77,7 +112,18 @@ def read_source_from_s3():
 
 
 def validate_dataframe(df):
-    """Perform basic ingestion checks."""
+    """
+    Perform basic validation checks on the ingested DataFrame.
+
+    Args:
+        df (pandas.DataFrame): Ingested transaction dataset.
+
+    Returns:
+        bool: True when required columns and rows are valid.
+
+    Raises:
+        ValueError: If required columns are missing or the dataset is empty.
+    """
 
     print("\nRunning basic ingestion checks...")
 
@@ -95,7 +141,7 @@ def validate_dataframe(df):
     if df.empty:
         raise ValueError("The incoming dataset contains no rows.")
 
-    print("[OK] File format: CSV")
+    print("[OK] Dataset structure: valid")
     print("[OK] Required columns: present")
     print(f"[OK] Rows: {len(df)}")
     print(f"[OK] Columns: {len(df.columns)}")
@@ -104,7 +150,16 @@ def validate_dataframe(df):
 
 
 def create_batches(df, batch_size=10000):
-    """Create batches without changing transaction contents."""
+    """
+    Split the DataFrame into batches without changing transaction contents.
+
+    Args:
+        df (pandas.DataFrame): Transaction dataset to split.
+        batch_size (int): Maximum number of rows in each batch.
+
+    Returns:
+        list: List of DataFrame batches.
+    """
 
     batches = []
 
@@ -124,7 +179,15 @@ def create_batches(df, batch_size=10000):
 
 
 def upload_batches_to_s3(batches):
-    """Upload simulated incoming batches to S3."""
+    """
+    Upload simulated CSV transaction batches to the S3 incoming location.
+
+    Args:
+        batches (list): List of transaction DataFrame batches.
+
+    Raises:
+        RuntimeError: If a batch cannot be uploaded to S3.
+    """
 
     s3 = boto3.client("s3")
 
@@ -163,6 +226,12 @@ def upload_batches_to_s3(batches):
 
 
 def main():
+    """
+    Run the simulated May transaction ingestion workflow.
+
+    The workflow validates the source format, validates the dataset,
+    creates transaction batches, and uploads the batches to S3.
+    """
 
     print("=" * 60)
     print("SIMULATED MAY DATA INGESTION")
