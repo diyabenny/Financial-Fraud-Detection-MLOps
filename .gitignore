@@ -225,6 +225,13 @@ data/raw/
 data/processed/
 data/features/
 
+# Phase 2 incoming datasets
+data/incoming/*
+!data/incoming/
+!data/incoming/*/
+!data/incoming/**/*.dvc
+data/incoming/**/*.csv
+
 # AWS credentials / secrets
 *.pem
 *.key
@@ -240,3 +247,5 @@ models/
 .vscode/
 
 .env
+
+reports/validation/
