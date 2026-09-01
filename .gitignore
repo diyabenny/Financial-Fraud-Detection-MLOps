@@ -247,3 +247,5 @@ models/
 .vscode/
 
 .env
+
+reports/validation/
