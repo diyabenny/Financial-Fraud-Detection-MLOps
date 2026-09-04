@@ -52,6 +52,10 @@ VALIDATION_FEATURES_PATH = Path(
 E01_OUTPUT_PATH = Path(
     "reports/phase3/experiments/E01_validation_predictions.csv"
 )
+
+E02_OUTPUT_PATH = Path(
+    "reports/phase3/experiments/E02_validation_predictions.csv"
+)
 # ---------------------------------------------------------------------------
 # Model configuration
 # ---------------------------------------------------------------------------
@@ -262,9 +266,43 @@ def build_e01_model() -> Pipeline:
     return model
 
 
+def build_e02_model() -> Pipeline:
+    """
+    Build the E02 Logistic Regression pipeline.
+
+    Returns
+    -------
+    Pipeline
+        A pipeline containing StandardScaler followed by
+        Logistic Regression with class-weight balancing.
+
+    Notes
+    -----
+    E02 introduces class_weight="balanced" to give greater
+    importance to the minority fraud class during training.
+    """
+    model = Pipeline(
+        steps=[
+            (
+                "scaler",
+                StandardScaler(),
+            ),
+            (
+                "classifier",
+                LogisticRegression(
+                    class_weight="balanced",
+                    random_state=RANDOM_STATE,
+                ),
+            ),
+        ]
+    )
+
+    return model
+
 def save_validation_predictions(
     validation_features: pd.DataFrame,
     validation_probabilities,
+    output_path: Path,
 ) -> None:
     """
     Save E01 validation probabilities for downstream evaluation.
@@ -297,24 +335,25 @@ def save_validation_predictions(
         }
     )
 
-    E01_OUTPUT_PATH.parent.mkdir(
-        parents=True,
-        exist_ok=True,
+    output_path.parent.mkdir(
+    parents=True,
+    exist_ok=True,
     )
 
     prediction_artifact.to_csv(
-        E01_OUTPUT_PATH,
-        index=False,
+    output_path,
+    index=False,
     )
 
     print(
-        "\nE01 prediction artifact saved to: "
-        f"{E01_OUTPUT_PATH}"
+    "\nPrediction artifact saved to: "
+    f"{output_path}"
     )
 
 
 def validate_saved_predictions(
     expected_rows: int,
+    output_path: Path,
 ) -> None:
     """
     Re-read and validate the saved E01 prediction artifact.
@@ -327,14 +366,14 @@ def validate_saved_predictions(
         If required columns are missing, the row count is incorrect,
         or fraud probabilities fall outside the range [0, 1].
     """
-    if not E01_OUTPUT_PATH.exists():
+    if not output_path.exists():
         raise FileNotFoundError(
             f"E01 prediction artifact not found: "
-            f"{E01_OUTPUT_PATH}"
+            f"{output_path}"
         )
 
     saved_predictions = pd.read_csv(
-        E01_OUTPUT_PATH
+        output_path
     )
 
     required_columns = {
@@ -371,7 +410,7 @@ def validate_saved_predictions(
         )
 
     print(
-        "E01 saved prediction artifact validation passed."
+    "Prediction artifact validation passed."
     )
 
 
@@ -494,11 +533,83 @@ def main() -> None:
     save_validation_predictions(
         validation_features=validation_features,
         validation_probabilities=validation_probabilities,
+        output_path=E01_OUTPUT_PATH,
     )
     validate_saved_predictions(
         expected_rows=len(validation_features),
+        output_path=E01_OUTPUT_PATH,
     )
     print("\nPhase 3.2 E01 completed successfully.")
+
+    print("\nBuilding E02 model...")
+    e02_model = build_e02_model()
+
+    print(
+        "\nE02 configuration:"
+        "\n  Model: Logistic Regression"
+        "\n  Imbalance strategy: class_weight='balanced'"
+        f"\n  Random state: {RANDOM_STATE}"
+    )
+
+    print("\nTraining E02...")
+
+    e02_model.fit(
+        X_train,
+        y_train,
+    )
+
+    print("E02 training completed.")
+
+    print("\nGenerating E02 validation fraud probabilities...")
+
+    e02_validation_probabilities = e02_model.predict_proba(
+        X_validation
+    )[:, 1]
+
+    print(
+        "Number of E02 validation probabilities: "
+        f"{len(e02_validation_probabilities)}"
+    )
+
+    print(
+        "Minimum E02 probability: "
+        f"{e02_validation_probabilities.min():.6f}"
+    )
+
+    print(
+        "Maximum E02 probability: "
+        f"{e02_validation_probabilities.max():.6f}"
+    )
+
+    if len(e02_validation_probabilities) != len(X_validation):
+        raise ValueError(
+            "Number of E02 validation probabilities does not match "
+            "the number of validation rows."
+        )
+
+    if not (
+        (e02_validation_probabilities >= 0).all()
+        and (e02_validation_probabilities <= 1).all()
+    ):
+        raise ValueError(
+            "E02 validation probabilities contain values outside "
+            "the range [0, 1]."
+        )
+
+    print("\nE02 probability sanity checks passed.")
+
+    save_validation_predictions(
+        validation_features=validation_features,
+        validation_probabilities=e02_validation_probabilities,
+        output_path=E02_OUTPUT_PATH,
+    )
+
+    validate_saved_predictions(
+        expected_rows=len(validation_features),
+        output_path=E02_OUTPUT_PATH,
+    )
+
+    print("\nPhase 3.2 E02 completed successfully.")
 
 
 if __name__ == "__main__":
