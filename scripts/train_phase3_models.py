@@ -28,10 +28,11 @@ import math
 from pathlib import Path
 
 import pandas as pd
+from imblearn.over_sampling import SMOTENC
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from imblearn.over_sampling import SMOTENC
 
 
 
@@ -72,6 +73,11 @@ E04_OUTPUT_PATH = Path(
 E05_OUTPUT_PATH = Path(
     "reports/phase3/experiments/"
     "E05_70_30_validation_predictions.csv"
+)
+
+E06_OUTPUT_PATH = Path(
+    "reports/phase3/experiments/"
+    "E06_validation_predictions.csv"
 )
 
 EXPERIMENTS = {
@@ -540,6 +546,28 @@ def build_e03_model() -> Pipeline:
 
     return model
 
+def build_e06_model() -> RandomForestClassifier:
+    """
+    Build the E06 Random Forest model.
+
+    E06 uses class weighting to give greater importance
+    to the minority fraud class.
+
+    Returns
+    -------
+    RandomForestClassifier
+        Configured Random Forest model.
+    """
+
+    model = RandomForestClassifier(
+        n_estimators=300,
+        class_weight="balanced",
+        random_state=RANDOM_STATE,
+        n_jobs=-1,
+    )
+
+    return model
+
 def save_validation_predictions(
     validation_features: pd.DataFrame,
     validation_probabilities,
@@ -769,6 +797,115 @@ def run_oversampling_experiment(
         f"\nPhase 3.2 {experiment_id} completed successfully."
     )
 
+def run_e06_experiment(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_validation: pd.DataFrame,
+    validation_features: pd.DataFrame,
+    output_path: Path,
+) -> None:
+    """
+    Run Phase 3.2 experiment E06 using Random Forest.
+
+    E06 uses the original imbalanced training distribution with
+    class weighting. No SMOTENC or other resampling is applied.
+
+    Parameters
+    ----------
+    X_train : pd.DataFrame
+        Phase 3.1 training features.
+
+    y_train : pd.Series
+        Phase 3.1 training target.
+
+    X_validation : pd.DataFrame
+        Untouched validation features.
+
+    validation_features : pd.DataFrame
+        Validation dataset containing TRANSACTION_ID and TX_FRAUD.
+
+    output_path : Path
+        Path for the E06 validation prediction artifact.
+    """
+
+    print("\n" + "=" * 70)
+    print("PHASE 3.2 - EXPERIMENT E06")
+    print("=" * 70)
+
+    print("\nE06 configuration:")
+    print("  Model: Random Forest")
+    print("  Imbalance strategy: class_weight='balanced'")
+    print("  Number of trees: 300")
+    print(f"  Random state: {RANDOM_STATE}")
+    print("  Feature scaling: None")
+    print("  SMOTENC: None")
+
+    print("\nTraining class distribution:")
+    print(y_train.value_counts().sort_index())
+
+    print("\nTraining E06...")
+
+    model = build_e06_model()
+
+    model.fit(
+        X_train,
+        y_train,
+    )
+
+    print("E06 training completed.")
+
+    print("\nGenerating E06 validation fraud probabilities...")
+
+    validation_probabilities = model.predict_proba(
+        X_validation
+    )[:, 1]
+
+    print(
+        "Number of E06 validation probabilities: "
+        f"{len(validation_probabilities)}"
+    )
+
+    print(
+        "Minimum E06 probability: "
+        f"{validation_probabilities.min():.6f}"
+    )
+
+    print(
+        "Maximum E06 probability: "
+        f"{validation_probabilities.max():.6f}"
+    )
+
+    if len(validation_probabilities) != len(
+        X_validation
+    ):
+        raise ValueError(
+            "Number of E06 validation probabilities does not "
+            "match the validation dataset length."
+        )
+
+    if not (
+        (validation_probabilities >= 0).all()
+        and (validation_probabilities <= 1).all()
+    ):
+        raise ValueError(
+            "E06 validation probabilities contain values "
+            "outside the range [0, 1]."
+        )
+
+    print("\nE06 probability sanity checks passed.")
+
+    save_validation_predictions(
+        validation_features=validation_features,
+        validation_probabilities=validation_probabilities,
+        output_path=output_path,
+    )
+
+    validate_saved_predictions(
+        expected_rows=len(validation_features),
+        output_path=output_path,
+    )
+
+    print("\nPhase 3.2 E06 completed successfully.")
 def main() -> None:
     """
     Run Phase 3.2 experiment E01.
