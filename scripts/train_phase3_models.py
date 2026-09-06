@@ -33,6 +33,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
 
 
 
@@ -78,6 +79,11 @@ E05_OUTPUT_PATH = Path(
 E06_OUTPUT_PATH = Path(
     "reports/phase3/experiments/"
     "E06_validation_predictions.csv"
+)
+
+E07_OUTPUT_PATH = Path(
+    "reports/phase3/experiments/"
+    "E07_validation_predictions.csv"
 )
 
 EXPERIMENTS = {
@@ -568,6 +574,77 @@ def build_e06_model() -> RandomForestClassifier:
 
     return model
 
+def calculate_scale_pos_weight(
+    y_train: pd.Series,
+) -> float:
+    """
+    Calculate XGBoost class-imbalance weight from the training target.
+
+    The ratio is calculated as:
+
+        negative_count / positive_count
+
+    Only the training target is used.
+
+    Parameters
+    ----------
+    y_train : pd.Series
+        Training target containing TX_FRAUD values.
+
+    Returns
+    -------
+    float
+        Training-derived scale_pos_weight.
+
+    Raises
+    ------
+    ValueError
+        If no positive fraud samples are present.
+    """
+
+    negative_count = (y_train == 0).sum()
+    positive_count = (y_train == 1).sum()
+
+    if positive_count == 0:
+        raise ValueError(
+            "Training target contains no positive fraud samples."
+        )
+
+    scale_pos_weight = (
+        negative_count / positive_count
+    )
+
+    return float(scale_pos_weight)
+
+def build_e07_model(
+    scale_pos_weight: float,
+) -> XGBClassifier:
+    """
+    Build the E07 XGBoost classifier.
+
+    Parameters
+    ----------
+    scale_pos_weight : float
+        Class-imbalance weight calculated from the training target.
+
+    Returns
+    -------
+    XGBClassifier
+        Configured XGBoost model.
+    """
+
+    model = XGBClassifier(
+        n_estimators=300,
+        max_depth=6,
+        learning_rate=0.05,
+        scale_pos_weight=scale_pos_weight,
+        random_state=RANDOM_STATE,
+        n_jobs=-1,
+        eval_metric="logloss",
+    )
+
+    return model
+
 def save_validation_predictions(
     validation_features: pd.DataFrame,
     validation_probabilities,
@@ -906,6 +983,135 @@ def run_e06_experiment(
     )
 
     print("\nPhase 3.2 E06 completed successfully.")
+
+def run_e07_experiment(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_validation: pd.DataFrame,
+    validation_features: pd.DataFrame,
+    output_path: Path,
+) -> None:
+    """
+    Run Phase 3.2 experiment E07 using XGBoost.
+
+    E07 uses the original imbalanced training distribution and
+    a training-derived scale_pos_weight. No SMOTENC or resampling
+    is applied.
+
+    Parameters
+    ----------
+    X_train : pd.DataFrame
+        Phase 3.1 training features.
+
+    y_train : pd.Series
+        Phase 3.1 training target.
+
+    X_validation : pd.DataFrame
+        Untouched validation features.
+
+    validation_features : pd.DataFrame
+        Validation dataset containing TRANSACTION_ID and TX_FRAUD.
+
+    output_path : Path
+        Path for the E07 validation prediction artifact.
+    """
+
+    print("\n" + "=" * 70)
+    print("PHASE 3.2 - EXPERIMENT E07")
+    print("=" * 70)
+
+    print("\nE07 configuration:")
+    print("  Model: XGBoost")
+    print("  Imbalance strategy: scale_pos_weight")
+    print("  SMOTENC: None")
+    print("  Feature scaling: None")
+    print("  Number of trees: 300")
+    print("  Max depth: 6")
+    print("  Learning rate: 0.05")
+    print(f"  Random state: {RANDOM_STATE}")
+    print("  Evaluation metric: logloss")
+
+    print("\nTraining class distribution:")
+    print(y_train.value_counts().sort_index())
+
+    print("\nCalculating scale_pos_weight...")
+
+    scale_pos_weight = calculate_scale_pos_weight(
+        y_train
+    )
+
+    print(
+        "Training-derived scale_pos_weight: "
+        f"{scale_pos_weight:.12f}"
+    )
+
+    print("\nTraining E07...")
+
+    model = build_e07_model(
+        scale_pos_weight=scale_pos_weight
+    )
+
+    model.fit(
+        X_train,
+        y_train,
+    )
+
+    print("E07 training completed.")
+
+    print(
+        "\nGenerating E07 validation fraud probabilities..."
+    )
+
+    validation_probabilities = model.predict_proba(
+        X_validation
+    )[:, 1]
+
+    print(
+        "Number of E07 validation probabilities: "
+        f"{len(validation_probabilities)}"
+    )
+
+    print(
+        "Minimum E07 probability: "
+        f"{validation_probabilities.min():.6f}"
+    )
+
+    print(
+        "Maximum E07 probability: "
+        f"{validation_probabilities.max():.6f}"
+    )
+
+    if len(validation_probabilities) != len(
+        X_validation
+    ):
+        raise ValueError(
+            "Number of E07 validation probabilities does not "
+            "match the validation dataset length."
+        )
+
+    if not (
+        (validation_probabilities >= 0).all()
+        and (validation_probabilities <= 1).all()
+    ):
+        raise ValueError(
+            "E07 validation probabilities contain values "
+            "outside the range [0, 1]."
+        )
+
+    print("\nE07 probability sanity checks passed.")
+
+    save_validation_predictions(
+        validation_features=validation_features,
+        validation_probabilities=validation_probabilities,
+        output_path=output_path,
+    )
+
+    validate_saved_predictions(
+        expected_rows=len(validation_features),
+        output_path=output_path,
+    )
+
+    print("\nPhase 3.2 E07 completed successfully.")
 def main() -> None:
     """
     Run Phase 3.2 experiment E01.
