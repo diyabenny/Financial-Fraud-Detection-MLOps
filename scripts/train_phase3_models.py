@@ -24,13 +24,15 @@ Important project boundaries:
     - TX_FRAUD_SCENARIO is excluded because of leakage risk.
     - Raw identifiers are not used as model features.
 """
-
+import math
 from pathlib import Path
 
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from imblearn.over_sampling import SMOTENC
+
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +58,36 @@ E01_OUTPUT_PATH = Path(
 E02_OUTPUT_PATH = Path(
     "reports/phase3/experiments/E02_validation_predictions.csv"
 )
+
+E03_OUTPUT_PATH = Path(
+    "reports/phase3/experiments/"
+    "E03_90_10_validation_predictions.csv"
+)
+
+E04_OUTPUT_PATH = Path(
+    "reports/phase3/experiments/"
+    "E04_80_20_validation_predictions.csv"
+)
+
+E05_OUTPUT_PATH = Path(
+    "reports/phase3/experiments/"
+    "E05_70_30_validation_predictions.csv"
+)
+
+EXPERIMENTS = {
+    "E03": {
+        "sampling_strategy": 10 / 90,
+        "output_path": E03_OUTPUT_PATH,
+    },
+    "E04": {
+        "sampling_strategy": 20 / 80,
+        "output_path": E04_OUTPUT_PATH,
+    },
+    "E05": {
+        "sampling_strategy": 30 / 70,
+        "output_path": E05_OUTPUT_PATH,
+    },
+}
 # ---------------------------------------------------------------------------
 # Model configuration
 # ---------------------------------------------------------------------------
@@ -68,6 +100,17 @@ MODEL_FEATURES = [
     "TX_HOUR",
     "TX_DAY_OF_WEEK",
     "TX_IS_WEEKEND",
+]
+
+SMOTENC_BASE_FEATURES = [
+    "TX_AMOUNT",
+    "TX_HOUR",
+    "TX_DAY_OF_WEEK",
+]
+
+SMOTENC_CATEGORICAL_FEATURES = [
+    "TX_HOUR",
+    "TX_DAY_OF_WEEK",
 ]
 
 TARGET_COLUMN = "TX_FRAUD"
@@ -231,7 +274,181 @@ def prepare_model_data(
         y_validation,
     )
 
+def resample_training_data(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    sampling_strategy: float,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """
+    Apply SMOTENC to the non-redundant base training features.
 
+    SMOTENC operates only on:
+        - TX_AMOUNT
+        - TX_HOUR
+        - TX_DAY_OF_WEEK
+
+    After resampling, the two deterministic derived features are
+    reconstructed:
+        - AMOUNT_LOG from TX_AMOUNT
+        - TX_IS_WEEKEND from TX_DAY_OF_WEEK
+
+    Parameters
+    ----------
+    X_train : pd.DataFrame
+        Original Phase 3.1 training feature matrix.
+    y_train : pd.Series
+        Training target.
+    sampling_strategy : float
+        SMOTENC minority/majority target ratio.
+
+    Returns
+    -------
+    tuple[pd.DataFrame, pd.Series]
+        Resampled five-feature training matrix and target.
+    """
+
+    # Select only the non-redundant base features for SMOTENC.
+    X_base = X_train[SMOTENC_BASE_FEATURES].copy()
+
+    # Convert categorical feature names to column positions.
+    categorical_indices = [
+        SMOTENC_BASE_FEATURES.index(feature)
+        for feature in SMOTENC_CATEGORICAL_FEATURES
+    ]
+
+    sampler = SMOTENC(
+        categorical_features=categorical_indices,
+        sampling_strategy=sampling_strategy,
+        random_state=RANDOM_STATE,
+        k_neighbors=5,
+    )
+
+    X_resampled, y_resampled = sampler.fit_resample(
+        X_base,
+        y_train,
+    )
+
+    X_resampled = pd.DataFrame(
+        X_resampled,
+        columns=SMOTENC_BASE_FEATURES,
+    )
+
+    y_resampled = pd.Series(
+        y_resampled,
+        name=TARGET_COLUMN,
+    )
+
+    # Build the actual Phase 3.1 day -> weekend mapping from training data.
+    day_to_weekend = (
+        X_train.groupby("TX_DAY_OF_WEEK")["TX_IS_WEEKEND"]
+        .first()
+        .astype(int)
+        .to_dict()
+    )
+
+    # Reconstruct deterministic derived features.
+    X_resampled["AMOUNT_LOG"] = (
+        X_resampled["TX_AMOUNT"].apply(math.log1p)
+    )
+
+    X_resampled["TX_IS_WEEKEND"] = (
+        X_resampled["TX_DAY_OF_WEEK"]
+        .map(day_to_weekend)
+    )
+
+    if X_resampled["TX_IS_WEEKEND"].isna().any():
+        raise ValueError(
+            "Generated TX_DAY_OF_WEEK contains a value without "
+            "a known TX_IS_WEEKEND mapping."
+        )
+
+    X_resampled["TX_IS_WEEKEND"] = (
+        X_resampled["TX_IS_WEEKEND"].astype(int)
+    )
+
+    # -----------------------------------------------------------------------
+    # Validate reconstructed and discrete features.
+    # -----------------------------------------------------------------------
+
+    # TX_HOUR must remain a valid whole-hour value from 0 through 23.
+    if not X_resampled["TX_HOUR"].between(0, 23).all():
+        raise ValueError(
+            "Resampled TX_HOUR contains values outside the valid range 0–23."
+        )
+
+    if X_resampled["TX_HOUR"].mod(1).ne(0).any():
+        raise ValueError(
+            "Resampled TX_HOUR contains fractional values."
+        )
+
+    # TX_DAY_OF_WEEK must remain a valid whole-day value from the
+    # observed Phase 3.1 mapping.
+    valid_days = set(
+        X_train["TX_DAY_OF_WEEK"].dropna().unique()
+    )
+
+    generated_days = set(
+        X_resampled["TX_DAY_OF_WEEK"].dropna().unique()
+    )
+
+    invalid_days = generated_days - valid_days
+
+    if invalid_days:
+        raise ValueError(
+            "Resampled TX_DAY_OF_WEEK contains invalid values: "
+            f"{sorted(invalid_days)}"
+        )
+
+    if X_resampled["TX_DAY_OF_WEEK"].mod(1).ne(0).any():
+        raise ValueError(
+            "Resampled TX_DAY_OF_WEEK contains fractional values."
+        )
+
+    # TX_IS_WEEKEND must remain binary.
+    if not X_resampled["TX_IS_WEEKEND"].isin([0, 1]).all():
+        raise ValueError(
+            "Resampled TX_IS_WEEKEND contains values other than 0 or 1."
+        )
+
+    # AMOUNT_LOG must exactly follow TX_AMOUNT.
+    expected_amount_log = X_resampled["TX_AMOUNT"].apply(
+        math.log1p
+    )
+
+    amount_log_mismatches = (
+        X_resampled["AMOUNT_LOG"]
+        .sub(expected_amount_log)
+        .abs()
+        .gt(1e-10)
+        .sum()
+    )
+
+    if amount_log_mismatches != 0:
+        raise ValueError(
+            "AMOUNT_LOG is inconsistent with TX_AMOUNT."
+        )
+
+    # TX_IS_WEEKEND must follow the original Phase 3.1 mapping.
+    expected_weekend = (
+        X_resampled["TX_DAY_OF_WEEK"]
+        .map(day_to_weekend)
+        .astype(int)
+    )
+
+    weekend_mismatches = (
+        X_resampled["TX_IS_WEEKEND"]
+        != expected_weekend
+    ).sum()
+
+    if weekend_mismatches != 0:
+        raise ValueError(
+            "TX_IS_WEEKEND is inconsistent with TX_DAY_OF_WEEK."
+        )
+
+    # Restore the final approved five-feature order.
+    X_resampled = X_resampled[MODEL_FEATURES]
+
+    return X_resampled, y_resampled
 def build_e01_model() -> Pipeline:
     """
     Build the E01 Logistic Regression pipeline.
@@ -291,6 +508,30 @@ def build_e02_model() -> Pipeline:
                 "classifier",
                 LogisticRegression(
                     class_weight="balanced",
+                    random_state=RANDOM_STATE,
+                ),
+            ),
+        ]
+    )
+
+    return model
+
+def build_e03_model() -> Pipeline:
+    """
+    Build the Logistic Regression pipeline used for E03-E05.
+
+    The same model configuration is used for all oversampling
+    experiments. Only the SMOTENC sampling ratio changes.
+    """
+    model = Pipeline(
+        steps=[
+            (
+                "scaler",
+                StandardScaler(),
+            ),
+            (
+                "classifier",
+                LogisticRegression(
                     random_state=RANDOM_STATE,
                 ),
             ),
@@ -413,6 +654,120 @@ def validate_saved_predictions(
     "Prediction artifact validation passed."
     )
 
+def run_oversampling_experiment(
+    experiment_id: str,
+    sampling_strategy: float,
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_validation: pd.DataFrame,
+    validation_features: pd.DataFrame,
+    output_path: Path,
+) -> None:
+    """
+    Run one Phase 3.2 synthetic oversampling experiment.
+
+    The oversampling step is applied only to the training data.
+    Validation data remains untouched.
+    """
+
+    print("\n" + "=" * 70)
+    print(f"PHASE 3.2 - EXPERIMENT {experiment_id}")
+    print("=" * 70)
+
+    print(f"\nSampling strategy: {sampling_strategy:.6f}")
+
+    print("\nOriginal training class distribution:")
+    print(y_train.value_counts().sort_index())
+
+    print("\nResampling training data...")
+
+    X_resampled, y_resampled = resample_training_data(
+        X_train=X_train,
+        y_train=y_train,
+        sampling_strategy=sampling_strategy,
+    )
+
+    print("\nResampled training class distribution:")
+    print(y_resampled.value_counts().sort_index())
+
+    print(
+        "\nResampled training shape: "
+        f"{X_resampled.shape}"
+    )
+
+    print("\nBuilding model...")
+
+    model = build_e03_model()
+
+    print("\nTraining model...")
+
+    model.fit(
+        X_resampled,
+        y_resampled,
+    )
+
+    print(
+        f"{experiment_id} training completed."
+    )
+
+    print(
+        "\nGenerating validation fraud probabilities..."
+    )
+
+    validation_probabilities = model.predict_proba(
+        X_validation
+    )[:, 1]
+
+    print(
+        "Number of validation probabilities: "
+        f"{len(validation_probabilities)}"
+    )
+
+    print(
+        "Minimum probability: "
+        f"{validation_probabilities.min():.6f}"
+    )
+
+    print(
+        "Maximum probability: "
+        f"{validation_probabilities.max():.6f}"
+    )
+
+    if len(validation_probabilities) != len(
+        X_validation
+    ):
+        raise ValueError(
+            f"{experiment_id} validation probability count "
+            "does not match the validation row count."
+        )
+
+    if not (
+        (validation_probabilities >= 0).all()
+        and (validation_probabilities <= 1).all()
+    ):
+        raise ValueError(
+            f"{experiment_id} validation probabilities "
+            "contain values outside [0, 1]."
+        )
+
+    print(
+        f"\n{experiment_id} probability sanity checks passed."
+    )
+
+    save_validation_predictions(
+        validation_features=validation_features,
+        validation_probabilities=validation_probabilities,
+        output_path=output_path,
+    )
+
+    validate_saved_predictions(
+        expected_rows=len(validation_features),
+        output_path=output_path,
+    )
+
+    print(
+        f"\nPhase 3.2 {experiment_id} completed successfully."
+    )
 
 def main() -> None:
     """
@@ -611,6 +966,20 @@ def main() -> None:
 
     print("\nPhase 3.2 E02 completed successfully.")
 
+    # -----------------------------------------------------------------------
+    # E03-E05: SMOTENC oversampling experiments
+    # -----------------------------------------------------------------------
+
+    for experiment_id, config in EXPERIMENTS.items():
+        run_oversampling_experiment(
+            experiment_id=experiment_id,
+            sampling_strategy=config["sampling_strategy"],
+            X_train=X_train,
+            y_train=y_train,
+            X_validation=X_validation,
+            validation_features=validation_features,
+            output_path=config["output_path"],
+        )
 
 if __name__ == "__main__":
     main()
