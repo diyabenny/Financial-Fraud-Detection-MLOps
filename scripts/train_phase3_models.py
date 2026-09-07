@@ -1324,5 +1324,29 @@ def main() -> None:
             output_path=config["output_path"],
         )
 
+    # -----------------------------------------------------------------------
+    # E06: Random Forest experiment
+    # -----------------------------------------------------------------------
+
+    run_e06_experiment(
+        X_train=X_train,
+        y_train=y_train,
+        X_validation=X_validation,
+        validation_features=validation_features,
+        output_path=E06_OUTPUT_PATH,
+    )
+
+    # -----------------------------------------------------------------------
+    # E07: XGBoost experiment
+    # -----------------------------------------------------------------------
+
+    run_e07_experiment(
+        X_train=X_train,
+        y_train=y_train,
+        X_validation=X_validation,
+        validation_features=validation_features,
+        output_path=E07_OUTPUT_PATH,
+    )
+
 if __name__ == "__main__":
     main()

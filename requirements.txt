@@ -5,3 +5,4 @@ scikit-learn
 matplotlib
 dvc[s3]
 xgboost==3.4.1
+imbalanced-learn==0.14.2
