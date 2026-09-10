@@ -300,6 +300,8 @@ The May online-ingestion workflow is retained for the later final-test stage, af
 
 Champion model frozen
         ↓
+Reset/recreate Feast Online Store
+        ↓
 May feature preparation
         ↓
 Sequential May batch ingestion
@@ -345,6 +347,8 @@ The May dataset contains:
 After the champion model is frozen, the intended workflow is:
 
 Champion model frozen
+        ↓
+Reset/recreate Feast Online Store
         ↓
 May feature preparation
         ↓
@@ -452,6 +456,8 @@ Final May evaluation
 May unseen test data
         ↓
 Champion model frozen
+        ↓
+Reset/recreate Feast Online Store
         ↓
 May feature preparation
         ↓
@@ -588,6 +594,8 @@ Problem: The initial Feast implementation processed and pushed the full May data
 
 Solution: The current online Feast demonstration was changed to non-test April/train development data. May-specific scripts are retained for the later final-test stage, and May is now locked against training, tuning, threshold selection, and champion selection until the champion model is frozen.
 
+Before the final May evaluation, the Feast Online Store will be reset or recreated so that no state from the earlier technical May validation run is reused.
+
 20. Final Results
 
 Component
@@ -695,6 +703,8 @@ Feature-definition consistency validation passes.
 The May processing and online-ingestion workflow was implemented and technically validated during the initial implementation. That earlier run is not used for model development or selection.
 
 Under the corrected workflow, May remains locked and reserved for the final unseen evaluation after the champion model is frozen.
+
+Before the final May evaluation, the Feast Online Store will be reset or recreated so that no state from the earlier technical May validation run is reused.
 
 After the champion model is frozen, the retained May workflow can be used for final feature preparation, Feast ingestion/retrieval, prediction, and evaluation.
 
