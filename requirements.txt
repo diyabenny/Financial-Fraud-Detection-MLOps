@@ -1,8 +1,11 @@
 boto3
 python-dotenv>=1.0.0
-pandas
+pandas==2.3.3
+numpy
 scikit-learn
 matplotlib
 dvc[s3]
 xgboost==3.4.1
 imbalanced-learn==0.14.2
+feast==0.66.0
+pyarrow==25.0.1
