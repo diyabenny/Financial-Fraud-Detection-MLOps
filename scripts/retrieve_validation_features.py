@@ -341,10 +341,8 @@ def create_validation_feature_dataset(
 
     return output_df
 
-
-if __name__ == "__main__":
+def main():
     validation_df = load_validation_data(VALIDATION_INPUT_PATH)
-
     print("Validation data shape:", validation_df.shape)
 
     entity_df = create_entity_dataframe(validation_df)
@@ -401,3 +399,6 @@ if __name__ == "__main__":
     validation_feature_dataset.to_csv(OUTPUT_PATH, index=False)
     print("\nValidation Feast feature dataset saved successfully.")
     print("Output path:", OUTPUT_PATH)
+
+if __name__ == "__main__":
+    main()
