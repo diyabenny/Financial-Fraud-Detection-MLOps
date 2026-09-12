@@ -258,3 +258,6 @@ feast_repo/**/__pycache__/
 feast_repo/**/data/*.parquet
 
 data/phase3/may_processed_features.csv
+
+data/phase3/train_feast_features.csv
+data/phase3/validation_feast_features.csv
