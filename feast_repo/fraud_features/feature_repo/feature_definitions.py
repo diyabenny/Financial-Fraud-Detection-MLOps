@@ -25,6 +25,16 @@ fraud_training_source = FileSource(
 
 
 # ---------------------------------------------------------
+# Validation source
+# ---------------------------------------------------------
+fraud_validation_source = FileSource(
+    name="fraud_validation_source",
+    path="data/validation_combined_features.parquet",
+    timestamp_field="TX_DATETIME",
+)
+
+
+# ---------------------------------------------------------
 # Push source for newly arriving May transactions
 # ---------------------------------------------------------
 # Python calculates the leakage-safe features first.
@@ -57,4 +67,30 @@ fraud_features = FeatureView(
     ],
     online=True,
     source=fraud_push_source,
+)
+
+
+# ---------------------------------------------------------
+# Validation Feature View
+# ---------------------------------------------------------
+# Uses the same 10 approved model features, but reads
+# the separately prepared validation Parquet source.
+fraud_validation_features = FeatureView(
+    name="fraud_validation_features",
+    entities=[transaction],
+    ttl=None,
+    schema=[
+        Field(name="TX_AMOUNT", dtype=Float32),
+        Field(name="AMOUNT_LOG", dtype=Float32),
+        Field(name="TX_HOUR", dtype=Int64),
+        Field(name="TX_DAY_OF_WEEK", dtype=Int64),
+        Field(name="TX_IS_WEEKEND", dtype=Int64),
+        Field(name="TERMINAL_TX_COUNT_1D", dtype=Float32),
+        Field(name="TERMINAL_TX_COUNT_7D", dtype=Float32),
+        Field(name="TERMINAL_AVG_AMOUNT_7D", dtype=Float32),
+        Field(name="CUSTOMER_TX_COUNT_1D", dtype=Float32),
+        Field(name="CUSTOMER_TX_COUNT_7D", dtype=Float32),
+    ],
+    online=True,
+    source=fraud_validation_source,
 )
