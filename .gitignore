@@ -249,8 +249,6 @@ models/
 .env
 
 reports/validation/
-
-
 # Feast local/generated files
 feast_repo/**/data/registry.db
 feast_repo/**/data/online_store.db
@@ -258,3 +256,6 @@ feast_repo/**/__pycache__/
 feast_repo/**/data/*.parquet
 
 data/phase3/may_processed_features.csv
+
+# MLflow local database
+mlflow.db
