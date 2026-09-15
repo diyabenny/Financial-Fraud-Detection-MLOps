@@ -3,8 +3,8 @@ Orchestrate historical Feast feature retrieval
 for training and validation datasets.
 """
 
-from retrieve_training_features import main as retrieve_training_features
-from retrieve_validation_features import main as retrieve_validation_features
+from scripts.retrieve_training_features import main as retrieve_training_features
+from scripts.retrieve_validation_features import main as retrieve_validation_features
 
 
 def main():
