@@ -77,6 +77,36 @@ evidence = [
     },
 
     {
+        "candidate": "RF_Balanced_300_None_1",
+        "threshold": 0.65,
+        "PR_AUC": 0.2574410304,
+        "ROC_AUC": 0.6370331816,
+        "precision": 1.0000000000,
+        "recall": 0.2338403042,
+        "F1": 0.3790446841,
+        "FPR": 0.0000000000,
+        "TP": 123,
+        "FP": 0,
+        "TN": 57241,
+        "FN": 403,
+
+        "Scenario_1_Total": 43,
+        "Scenario_1_TP": 43,
+        "Scenario_1_FN": 0,
+        "Scenario_1_Detection_Rate": 1.0000000000,
+
+        "Scenario_2_Total": 324,
+        "Scenario_2_TP": 1,
+        "Scenario_2_FN": 323,
+        "Scenario_2_Detection_Rate": 0.0030864198,
+
+        "Scenario_3_Total": 159,
+        "Scenario_3_TP": 79,
+        "Scenario_3_FN": 80,
+        "Scenario_3_Detection_Rate": 0.4968553459,
+    },
+
+    {
         "candidate": "LR_Balanced_C_10",
         "threshold": 0.95,
         "PR_AUC": 0.2593350753,

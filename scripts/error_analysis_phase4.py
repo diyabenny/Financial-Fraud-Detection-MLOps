@@ -40,6 +40,7 @@ CANDIDATES = [
         },
         "threshold": 0.10,
     },
+
     {
         "name": "RF_Balanced_100_None_1",
         "model_type": "random_forest",
@@ -51,6 +52,19 @@ CANDIDATES = [
         },
         "threshold": 0.65,
     },
+
+    {
+        "name": "RF_Balanced_300_None_1",
+        "model_type": "random_forest",
+        "imbalance_strategy": "balanced",
+        "model_parameters": {
+            "n_estimators": 300,
+            "max_depth": None,
+            "min_samples_leaf": 1,
+        },
+        "threshold": 0.65,
+    },
+
     {
         "name": "LR_Balanced_C_10",
         "model_type": "logistic_regression",
