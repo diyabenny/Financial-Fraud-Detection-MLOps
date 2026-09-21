@@ -1340,6 +1340,10 @@ def run_experiment():
         mlflow.sklearn.log_model(
             stage2_model,
             name="controlled_xgboost_model",
+            skops_trusted_types=[
+                "xgboost.core.Booster",
+                "xgboost.sklearn.XGBClassifier",
+            ],
         )
 
         print(
