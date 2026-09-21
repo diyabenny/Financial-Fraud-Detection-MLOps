@@ -18,6 +18,7 @@ OUTPUT_FILE = Path(
 evidence = [
     {
         "candidate": "LR_Original_C_0.01",
+        "scenario_evidence_available": True,
         "threshold": 0.10,
         "PR_AUC": 0.2720652421,
         "ROC_AUC": 0.6783075401,
@@ -48,6 +49,7 @@ evidence = [
 
     {
         "candidate": "RF_Balanced_100_None_1",
+        "scenario_evidence_available": True,
         "threshold": 0.65,
         "PR_AUC": 0.2536834538,
         "ROC_AUC": 0.6254614520,
@@ -78,6 +80,7 @@ evidence = [
 
     {
         "candidate": "RF_Balanced_300_None_1",
+        "scenario_evidence_available": True,
         "threshold": 0.65,
         "PR_AUC": 0.2574410304,
         "ROC_AUC": 0.6370331816,
@@ -108,6 +111,7 @@ evidence = [
 
     {
         "candidate": "LR_Balanced_C_10",
+        "scenario_evidence_available": True,
         "threshold": 0.95,
         "PR_AUC": 0.2593350753,
         "ROC_AUC": 0.6794600284,
@@ -135,6 +139,39 @@ evidence = [
         "Scenario_3_FN": 84,
         "Scenario_3_Detection_Rate": 0.4716981132,
     },
+
+    {
+        "candidate": "Controlled_XGBoost",
+        "scenario_evidence_available": False,
+        "threshold": 0.86,
+        "PR_AUC": 0.1410992110,
+        "ROC_AUC": 0.6286846661,
+        "precision": 0.4804687500,
+        "recall": 0.2338403042,
+        "F1": 0.3145780051,
+        "FPR": 0.0023235094,
+        "TP": 123,
+        "FP": 133,
+        "TN": 57108,
+        "FN": 403,
+
+        # No verified transaction-level/scenario-level
+        # XGBoost evidence was generated.
+        "Scenario_1_Total": None,
+        "Scenario_1_TP": None,
+        "Scenario_1_FN": None,
+        "Scenario_1_Detection_Rate": None,
+
+        "Scenario_2_Total": None,
+        "Scenario_2_TP": None,
+        "Scenario_2_FN": None,
+        "Scenario_2_Detection_Rate": None,
+
+        "Scenario_3_Total": None,
+        "Scenario_3_TP": None,
+        "Scenario_3_FN": None,
+        "Scenario_3_Detection_Rate": None,
+    },
 ]
 
 
@@ -154,6 +191,79 @@ print("UPDATED PHASE 4 CANDIDATE EVIDENCE TABLE")
 print("=" * 80)
 
 print(df.to_string(index=False))
+
+
+# ============================================================
+# Candidate-count verification
+# ============================================================
+
+expected_candidates = 5
+
+if len(df) != expected_candidates:
+    raise ValueError(
+        f"Expected {expected_candidates} candidate configurations, "
+        f"found {len(df)}."
+    )
+
+print(
+    f"\nCandidate configuration count verified: {len(df)}"
+)
+
+
+# ============================================================
+# Scenario-evidence status verification
+# ============================================================
+
+scenario_available_count = int(
+    df["scenario_evidence_available"].sum()
+)
+
+scenario_unavailable_count = int(
+    (~df["scenario_evidence_available"]).sum()
+)
+
+if scenario_available_count != 4:
+    raise ValueError(
+        "Expected scenario-level evidence for exactly "
+        "four candidates."
+    )
+
+if scenario_unavailable_count != 1:
+    raise ValueError(
+        "Expected exactly one candidate without "
+        "scenario-level evidence."
+    )
+
+xgboost_rows = df[
+    df["candidate"] == "Controlled_XGBoost"
+]
+
+if len(xgboost_rows) != 1:
+    raise ValueError(
+        "Controlled_XGBoost candidate is missing or duplicated."
+    )
+
+if bool(
+    xgboost_rows["scenario_evidence_available"].iloc[0]
+):
+    raise ValueError(
+        "Controlled_XGBoost must have "
+        "scenario_evidence_available=False."
+    )
+
+print(
+    "\nScenario evidence status verified:"
+)
+
+print(
+    f"Candidates with scenario evidence: "
+    f"{scenario_available_count}"
+)
+
+print(
+    f"Candidates without scenario evidence: "
+    f"{scenario_unavailable_count}"
+)
 
 
 # ============================================================
@@ -199,6 +309,16 @@ print("=" * 80)
 
 for _, row in df.iterrows():
 
+    if not row["scenario_evidence_available"]:
+
+        print(
+            f"{row['candidate']}: "
+            "scenario-level evidence unavailable; "
+            "scenario validation skipped."
+        )
+
+        continue
+
     for scenario in [1, 2, 3]:
 
         total = row[f"Scenario_{scenario}_Total"]
@@ -232,17 +352,26 @@ for _, row in df.iterrows():
         )
 
 
-print("\nAll scenario checks passed.")
+print("\nScenario validation completed.")
 
 
 # ============================================================
 # Verify scenario totals
 # ============================================================
 
+scenario_evidence = df[
+    df["scenario_evidence_available"]
+]
+
+if scenario_evidence.empty:
+    raise ValueError(
+        "No candidates contain scenario-level evidence."
+    )
+
 scenario_totals = [
-    df["Scenario_1_Total"].iloc[0],
-    df["Scenario_2_Total"].iloc[0],
-    df["Scenario_3_Total"].iloc[0],
+    scenario_evidence["Scenario_1_Total"].iloc[0],
+    scenario_evidence["Scenario_2_Total"].iloc[0],
+    scenario_evidence["Scenario_3_Total"].iloc[0],
 ]
 
 if sum(scenario_totals) != 526:
