@@ -1,556 +1,732 @@
-\# Phase 4 — Model Evaluation and Error Analysis
+# Phase 4 — Model Evaluation, Error Analysis, and Pre-Champion Handoff
 
+## 1. Objective
 
+Phase 4 focused on evaluating shortlisted fraud-detection candidates using a controlled temporal evaluation process, selecting candidate-specific operating thresholds, performing error and scenario analysis, and consolidating reproducibility evidence for team-level Champion discussion.
 
-\## 1. Overview
+The Phase 4 workflow covered:
 
-Phase 4 evaluates fraud detection model candidates using the feature layer prepared during Phase 3. The evaluation focuses on candidate model performance, precision, recall, F1, PR-AUC, ROC-AUC, false-positive and false-negative behavior, fraud-scenario-level detection, and controlled Random Forest experimentation. Champion selection is a team decision and remains pending at this stage.
+- Candidate evaluation on a common April 25–30 evaluation period
+- Candidate-specific threshold selection using earlier April data
+- Controlled comparison of selected Logistic Regression and Random Forest candidates
+- A controlled RF-300 experiment
+- A controlled XGBoost experiment
+- False-negative and false-positive analysis
+- Scenario-level analysis
+- Feature-level error analysis
+- MLflow and reproducibility verification
+- Feast historical and online retrieval verification
+- Evidence consolidation for pre-Champion handoff
 
+SMOTENC and other imbalance approaches were explored in earlier Phase 4 experimentation but were not introduced as additional controlled candidates in the final Phase 4 candidate comparison.
 
+Phase 4 does **not** declare a Champion. Champion selection and subsequent final validation are outside the scope of this document.
 
-\## 2. Evaluation Setup
+---
 
+## 2. Round 1 Candidate Tuning and Carry-Forward
 
+### 2.1 Temporal Tuning Protocol
 
-\### Training Dataset
+Round 1 tuning used a temporal split:
 
-\- Dataset: `data/phase3/train\_feast\_features.csv`
+- **Tuning training period:** April 1–18, 2018
+- **Tuning validation period:** April 19–24, 2018
+- **Threshold during Round 1 tuning:** 0.5
 
-\- Period: April 1–24
+The purpose was to compare candidate configurations using a time-ordered validation period while preserving temporal separation between training and validation data.
 
-\- Rows: 230,295
+### 2.2 Round 1 Configuration Space
 
-\- Fraud transactions: 1,176
+A total of **32 configurations** were evaluated.
 
+#### Logistic Regression
 
+Eight Logistic Regression configurations were evaluated:
 
-\### Evaluation Dataset
+- Original class weighting:
+  - C = 0.01
+  - C = 0.1
+  - C = 1
+  - C = 10
+- Balanced class weighting:
+  - C = 0.01
+  - C = 0.1
+  - C = 1
+  - C = 10
 
-\- Dataset: `data/phase4/april\_25\_30\_evaluation\_features.csv`
+The Logistic Regression implementation used:
 
-\- Period: April 25–30
+- `StandardScaler`
+- `LogisticRegression`
+- `random_state=42`
+- `max_iter=1000`
+- Configurable `C`
+- `class_weight=None` or `class_weight="balanced"`
 
-\- Rows: 57,767
+#### Random Forest
 
-\- Fraud transactions: 526
+Twenty-four balanced Random Forest configurations were evaluated using:
 
+- `n_estimators`: 100, 300
+- `max_depth`: None, 10, 20
+- `min_samples_leaf`: 1, 5
+- `class_weight="balanced"`
+- `random_state=42`
+- `n_jobs=-1`
 
+### 2.3 Carry-Forward Candidates
 
-The same April 25–30 evaluation dataset was used for all four candidates.
+The following configurations were carried forward from Round 1 for Phase 4 candidate evaluation:
 
+1. Logistic Regression — Original — C=0.01
+2. Random Forest — Balanced — 100 estimators
+3. Logistic Regression — Balanced — C=10
 
+These three configurations formed the Round 1 carry-forward set. RF-300 and controlled XGBoost were subsequently added as controlled Phase 4 candidates.
 
-\### Model Features
+---
 
-\- `TX\_AMOUNT`
+## 3. Evaluation Dataset and Temporal Protocol
 
-\- `AMOUNT\_LOG`
+### 3.1 Training Dataset
 
-\- `TX\_HOUR`
+The candidate models were trained using:
 
-\- `TX\_DAY\_OF\_WEEK`
+`data/phase3/train_feast_features.csv`
 
-\- `TX\_IS\_WEEKEND`
+Training period:
 
-\- `TERMINAL\_TX\_COUNT\_1D`
+- **April 1–24, 2018**
+- Rows: **230,295**
+- Legitimate transactions: **229,119**
+- Fraudulent transactions: **1,176**
 
-\- `TERMINAL\_TX\_COUNT\_7D`
+### 3.2 Common Evaluation Dataset
 
-\- `TERMINAL\_AVG\_AMOUNT\_7D`
+All controlled candidate evaluations used:
 
-\- `CUSTOMER\_TX\_COUNT\_1D`
+`data/phase4/april_25_30_evaluation_features.csv`
 
-\- `CUSTOMER\_TX\_COUNT\_7D`
+Evaluation period:
 
+- **April 25–30, 2018**
+- Rows: **57,767**
+- Legitimate transactions: **57,241**
+- Fraudulent transactions: **526**
 
+The evaluation period occurs after the candidate training period.
 
-\### Data Isolation
+However, April 25–30 is not described as a completely untouched holdout because it had been accessed earlier for preliminary Phase 4 screening. It was not used for final candidate fitting or threshold selection.
 
-May 1–19 data was not used for model selection or tuning. The April 25–30 period was retained as the evaluation period for the Phase 4 candidate comparison.
+### 3.3 Approved Model Features
 
+The approved feature set contained ten model inputs:
 
+```text
+TX_AMOUNT
+AMOUNT_LOG
+TX_HOUR
+TX_DAY_OF_WEEK
+TX_IS_WEEKEND
+TERMINAL_TX_COUNT_1D
+TERMINAL_TX_COUNT_7D
+TERMINAL_AVG_AMOUNT_7D
+CUSTOMER_TX_COUNT_1D
+CUSTOMER_TX_COUNT_7D
+```
 
-\## 3. Candidate Models
+The following were not used as model inputs:
 
+- Transaction identifiers
+- Raw timestamps
+- `TX_FRAUD_SCENARIO`
 
+`TX_FRAUD_SCENARIO` was excluded from model inputs to avoid leakage and was retained for downstream analysis where available.
 
-\### Logistic Regression — Original
+---
 
-\- Model: Logistic Regression
+## 4. Original Candidate Threshold Selection
 
-\- Class weighting: None
+Candidate-specific thresholds were selected using an earlier temporal portion of the April training period rather than the common April 25–30 evaluation period.
 
-\- `C`: 0.01
+### 4.1 Threshold Selection Protocol
 
-\- Threshold: 0.10
+The threshold-selection process used:
 
+- **Fitting period:** April 1–12, 2018
+- **Threshold-selection period:** April 13–18, 2018
+- Threshold search range: **0.01 to 0.95**
+- Selection criterion: **maximum F1**
+- Overlap between fitting and threshold-selection periods: **0**
 
+Dataset sizes:
 
-\### Random Forest — 100 Trees
+| Period | Rows | Legitimate | Fraud |
+|---|---:|---:|---:|
+| April 1–12 | 114,978 | 114,610 | 368 |
+| April 13–18 | 57,525 | 57,176 | 349 |
 
-\- Model: Random Forest
+After threshold selection, each of the three Round 1 carry-forward candidates was retrained using the complete April 1–24 training period before evaluation on April 25–30. RF-300 reused the RF-100 threshold of 0.65, while controlled XGBoost used its separately selected threshold of 0.86.
 
-\- `n\_estimators`: 100
+### 4.2 Selected Thresholds
 
-\- Class weighting: `balanced`
+| Candidate | Selected Threshold |
+|---|---:|
+| LR Original C=0.01 | 0.10 |
+| RF Balanced 100 | 0.65 |
+| LR Balanced C=10 | 0.95 |
 
-\- `max\_depth`: `None`
+---
 
-\- `min\_samples\_leaf`: 1
+## 5. Candidate Configuration Summary
 
-\- Threshold: 0.65
+| Candidate | Model Configuration | Threshold |
+|---|---|---:|
+| LR Original C=0.01 | StandardScaler → LogisticRegression, C=0.01, class_weight=None, random_state=42, max_iter=1000 | 0.10 |
+| RF Balanced 100 | RandomForest, n_estimators=100, max_depth=None, min_samples_leaf=1, class_weight=balanced, random_state=42, n_jobs=-1 | 0.65 |
+| RF Balanced 300 | RandomForest, n_estimators=300, max_depth=None, min_samples_leaf=1, class_weight=balanced, random_state=42, n_jobs=-1 | 0.65 |
+| LR Balanced C=10 | StandardScaler → LogisticRegression, C=10, class_weight=balanced, random_state=42, max_iter=1000 | 0.95 |
+| Controlled XGBoost | StandardScaler → XGBoost, n_estimators=300, max_depth=6, learning_rate=0.05, objective=binary:logistic, random_state=42, n_jobs=-1, eval_metric=logloss | 0.86 |
 
-\- Random state: 42
+---
 
+## 6. Candidate Aggregate Evaluation
 
+All aggregate candidate metrics below were calculated on the common **April 25–30, 2018** evaluation dataset.
 
-\### Random Forest — 300 Trees
+### 6.1 Aggregate Metrics
 
-\- Model: Random Forest
+| Candidate | Threshold | PR-AUC | ROC-AUC | Recall | Precision | F1 | Accuracy | FPR (fraction) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| LR Original C=0.01 | 0.10 | 0.272065 | 0.678308 | 0.241445 | 0.774390 | 0.368116 | 0.992452 | 0.000646 |
+| RF Balanced 100 | 0.65 | 0.253683 | 0.625461 | 0.233840 | 0.991935 | 0.378462 | 0.993006 | 0.000017 |
+| RF Balanced 300 | 0.65 | 0.257441 | 0.637033 | 0.233840 | 1.000000 | 0.379045 | 0.993024 | 0.000000 |
+| LR Balanced C=10 | 0.95 | 0.259335 | 0.679460 | 0.161597 | 0.977011 | 0.277325 | 0.992331 | 0.000035 |
+| Controlled XGBoost | 0.86 | 0.141099 | 0.628685 | 0.233840 | 0.480469 | 0.314578 | 0.990721 | 0.002324 |
 
-\- `n\_estimators`: 300
+### 6.2 Confusion-Matrix Counts
 
-\- Class weighting: `balanced`
+| Candidate | TP | FP | TN | FN |
+|---|---:|---:|---:|---:|
+| LR Original C=0.01 | 127 | 37 | 57,204 | 399 |
+| RF Balanced 100 | 123 | 1 | 57,240 | 403 |
+| RF Balanced 300 | 123 | 0 | 57,241 | 403 |
+| LR Balanced C=10 | 85 | 2 | 57,239 | 441 |
+| Controlled XGBoost | 123 | 133 | 57,108 | 403 |
 
-\- `max\_depth`: `None`
+The controlled XGBoost results are included in the aggregate candidate evidence for team comparison. The results apply only to the fixed XGBoost configuration tested in this experiment.
 
-\- `min\_samples\_leaf`: 1
+---
 
-\- Threshold: 0.65
+## 7. RF-300 Controlled Candidate
 
-\- Random state: 42
+RF-300 was introduced as a controlled experiment based on the RF-100 configuration.
 
+### 7.1 Controlled Change
 
+Only the number of estimators was changed:
 
-\### Logistic Regression — Balanced
+```text
+RF-100 → RF-300
+```
 
-\- Model: Logistic Regression
+The following were held constant:
 
-\- Class weighting: `balanced`
+- Model family: Random Forest
+- `class_weight="balanced"`
+- `max_depth=None`
+- `min_samples_leaf=1`
+- `random_state=42`
+- `n_jobs=-1`
+- Approved feature set
+- Training period: April 1–24
+- Threshold: 0.65
+- Evaluation period: April 25–30
 
-\- `C`: 10
+No broad Random Forest hyperparameter search was introduced as part of this experiment.
 
-\- Threshold: 0.95
+### 7.2 RF-300 Evaluation
 
+RF-300 produced:
 
+- PR-AUC: **0.257441**
+- ROC-AUC: **0.637033**
+- Recall: **0.233840**
+- Precision: **1.000000**
+- F1: **0.379045**
+- Accuracy: **0.993024**
+- FPR: **0**
+- TP: **123**
+- FP: **0**
+- TN: **57,241**
+- FN: **403**
 
-\## 4. Four-Candidate Evaluation Results
+The RF-300 experiment was treated as a controlled candidate comparison and not as a Champion decision.
 
-All four candidates were evaluated on the same April 25–30 evaluation dataset.
+---
 
+## 8. Controlled XGBoost Experiment
 
+### 8.1 Objective
 
-| Candidate | Threshold | PR-AUC | ROC-AUC | Precision | Recall | F1 | FPR | TP | FP | TN | FN |
+A fixed XGBoost configuration was evaluated as an additional controlled Phase 4 candidate.
 
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+No XGBoost hyperparameter tuning was performed as part of this experiment.
 
-| LR Original C=0.01 | 0.10 | 0.2721 | 0.6783 | 0.7744 | 0.2414 | 0.3681 | 0.000646 | 127 | 37 | 57204 | 399 |
+### 8.2 Configuration
 
-| RF Balanced 100 | 0.65 | 0.2537 | 0.6255 | 0.9919 | 0.2338 | 0.3785 | 0.000017 | 123 | 1 | 57240 | 403 |
+```text
+n_estimators=300
+max_depth=6
+learning_rate=0.05
+objective=binary:logistic
+random_state=42
+n_jobs=-1
+eval_metric=logloss
+```
 
-| RF Balanced 300 | 0.65 | 0.2574 | 0.6370 | 1.0000 | 0.2338 | 0.3790 | 0.000000 | 123 | 0 | 57241 | 403 |
+The model was implemented using a `StandardScaler` inside a scikit-learn pipeline.
 
-| LR Balanced C=10 | 0.95 | 0.2593 | 0.6795 | 0.9770 | 0.1616 | 0.2773 | 0.000035 | 85 | 2 | 57239 | 441 |
+The approved ten-feature set was unchanged.
 
+No SMOTE, SMOTENC, ADASYN, or other additional resampling method was introduced for this controlled XGBoost experiment.
 
+### 8.3 Temporal Procedure
 
-These results are evaluation evidence for team review. They do not designate a Champion or establish a ranking of the candidates.
+#### Stage 1: Initial fitting
 
+Period:
 
+- April 1–12, 2018
+- Rows: 114,978
+- Legitimate: 114,610
+- Fraud: 368
+- `scale_pos_weight`: 311.4402173913044
 
-\## 5. Controlled RF-100 → RF-300 Experiment
+#### Threshold Selection
 
-A controlled Random Forest experiment was performed by changing only the number of trees:
+Period:
 
+- April 13–18, 2018
+- Rows: 57,525
+- Legitimate: 57,176
+- Fraud: 349
+- Selection criterion: maximum F1
+- Selected threshold: **0.86**
+- Overlap with Stage 1: **0**
 
+#### Stage 2 Retraining for Final Evaluation
 
-`RF-100 → RF-300`
+Period:
 
+- April 1–24, 2018
+- Rows: 230,295
+- Legitimate: 229,119
+- Fraud: 1,176
+- `scale_pos_weight`: 194.82908163265307
+- Overlap with April 25–30 evaluation period: **0**
 
+#### Final Evaluation
 
-\### Controlled Change
+Period:
 
-`n\_estimators: 100 → 300`
+- April 25–30, 2018
+- Rows: 57,767
+- Legitimate: 57,241
+- Fraud: 526
+- Threshold: **0.86**
 
+### 8.4 Controlled XGBoost Results
 
+| Metric | Result |
+|---|---:|
+| PR-AUC | 0.141099 |
+| ROC-AUC | 0.628685 |
+| Precision | 0.480469 |
+| Recall | 0.233840 |
+| F1 | 0.314578 |
+| Accuracy | 0.990721 |
+| FPR | 0.002324 |
+| TP | 123 |
+| FP | 133 |
+| TN | 57,108 |
+| FN | 403 |
 
-\### Variables Kept Constant
+### 8.5 XGBoost Evidence Boundary
 
-\- Class weighting: `balanced`
+The controlled XGBoost evidence available for Phase 4 consists of:
 
-\- `max\_depth`: `None`
+- Aggregate evaluation metrics
+- Confusion-matrix results
+- MLflow experiment/model evidence
+- Provenance information
+- Threshold results
 
-\- `min\_samples\_leaf`: 1
+A separate transaction-level prediction artifact with scenario-level XGBoost analysis was not available.
 
-\- Random state: 42
+Therefore, XGBoost is not retrofitted into the transaction-level error-analysis or scenario-analysis artifacts.
 
-\- Threshold: 0.65
+### 8.6 Historical XGBoost Screening Evidence
 
-\- Same 10 model features
+Earlier XGBoost screening runs could not be confidently reconciled with the documented controlled configurations because the saved configuration information and original metadata/artifact structure were incomplete or inconsistent.
 
-\- Training period: April 1–24
+Historical X01/X02/X03 results are therefore retained as historical/unverified screening evidence and are not treated as controlled candidate evidence.
 
-\- Evaluation period: April 25–30
+The historical XGBoost screening was not rerun.
 
+### 8.7 MLflow Serialization Correction
 
+During model logging, the MLflow/skops serialization step required explicit trusted XGBoost types. The logging configuration was corrected in commit `843bb87`; the model configuration and experiment results were not changed, and the experiment was not rerun.
 
-May 1–19 data remained excluded from model selection and tuning.
+---
 
+## 9. False-Negative Analysis
 
+False-negative analysis was performed to identify patterns among fraudulent transactions that were not detected by the evaluated candidates.
 
-\### RF-300 Results
+The analysis was supported by:
 
-\- PR-AUC: 0.2574
+- Transaction-level prediction evidence
+- False-negative records
+- Feature-level false-negative analysis
 
-\- ROC-AUC: 0.6370
+The analysis was used to understand observed model errors and identify areas for further investigation.
 
-\- Precision: 1.0000
+It was not used to declare a Champion.
 
-\- Recall: 0.2338
+---
 
-\- F1: 0.3790
+## 10. False-Positive and Feature-Level Analysis
 
-\- FPR: 0.0000
+False-positive analysis was performed for candidates with false-positive predictions on the common April 25–30 evaluation period.
 
-\- TP: 123
+Supporting artifacts include:
 
-\- FP: 0
+- False-positive records
+- Feature-level false-positive analysis
 
-\- TN: 57,241
+The analysis provides candidate-specific error evidence and supports interpretation of aggregate evaluation results.
 
-\- FN: 403
+---
 
+## 11. Scenario-Level Analysis
 
+Scenario-level analysis was performed using the fraud-scenario labels available in the evaluation data.
 
-\### Observed Difference from RF-100
+### 11.1 Fraud Scenario Distribution
 
-RF-100:
+| Scenario | Fraud Count | Percentage |
+|---|---:|---:|
+| S1 | 43 | 8.17% |
+| S2 | 324 | 61.60% |
+| S3 | 159 | 30.23% |
+| **Total** | **526** | **100%** |
 
-\- PR-AUC: 0.2537
-
-\- ROC-AUC: 0.6255
-
-\- Precision: 0.9919
-
-\- Recall: 0.2338
-
-\- F1: 0.3785
-
-\- FP: 1
-
-\- FN: 403
-
-
-
-RF-300:
-
-\- PR-AUC: 0.2574
-
-\- ROC-AUC: 0.6370
-
-\- Precision: 1.0000
-
-\- Recall: 0.2338
-
-\- F1: 0.3790
-
-\- FP: 0
-
-\- FN: 403
-
-
-
-The controlled experiment showed a small change in ranking metrics and precision, while recall and the number of false negatives remained unchanged. These observations are recorded for team review and do not by themselves determine Champion selection.
-
-
-
-\## 6. Transaction-Level Error Analysis
-
-
-
-\### RF-300
-
-On the April 25–30 evaluation dataset:
-
-\- True Positives: 123
-
-\- False Positives: 0
-
-\- True Negatives: 57,241
-
-\- False Negatives: 403
-
-
-
-At the fixed threshold of 0.65, RF-300 produced no false-positive transactions while 403 fraudulent transactions were classified as negative.
-
-
-
-The false-negative analysis is descriptive and does not establish causal reasons for individual model errors.
-
-
-
-\### False Positives
-
-RF-300 produced 0 false positives. Therefore, there are no RF-300 transaction rows to add to the false-positive dataset.
-
-
-
-The existing `phase4\_false\_positives.csv` remains unchanged because it contains actual false-positive transactions from candidates that produced false positives. No artificial RF-300 row is added to represent the zero count.
-
-
-
-\### False Negatives
-
-The false-negative analysis was updated to include all four candidates.
-
-
+### 11.2 RF-300 Scenario Detection
 
 For RF-300:
 
-\- False Negatives: 403
+| Scenario | Detected | Total Fraud | Detection Rate |
+|---|---:|---:|---:|
+| S1 | 43 | 43 | 100.00% |
+| S2 | 1 | 324 | 0.31% |
+| S3 | 79 | 159 | 49.69% |
 
+RF-300 produced:
 
+- TP: 123
+- FN: 403
 
-\## 7. Fraud Scenario Analysis
+Of the 403 RF-300 false negatives:
 
-The 526 fraudulent transactions in the April 25–30 evaluation period were distributed as follows:
+- **323** were Scenario 2
+- **80.15%** of RF-300 false negatives were therefore associated with Scenario 2
 
+The RF-300 scenario evidence therefore identifies Scenario 2 as an observed detection limitation for RF-300.
 
+### 11.3 Historical Terminal-Fraud Diagnostic
 
-| Scenario | Fraud Transactions | Percentage |
+A historical terminal-fraud diagnostic had previously been investigated as a possible explanation for the Scenario 2 pattern. However, the underlying diagnostic calculation and its denominator could not be located in the current repository evidence. Therefore, previously reported historical terminal-fraud percentages and mean counts are not treated as verified Phase 4 evidence and are not reproduced here.
 
-|---|---:|---:|
+`TERMINAL_PREVIOUS_FRAUD_COUNT` was not added to the production feature set.
 
-| Scenario 1 | 43 | 8.17% |
+### 11.4 Velocity Diagnostic
 
-| Scenario 2 | 324 | 61.60% |
+A previously discussed velocity diagnostic was not traceable to a verified Phase 4 repository artifact during the final verification pass. Therefore exact velocity feature names, previously reported velocity metrics, and velocity-based improvement claims are not included.
 
-| Scenario 3 | 159 | 30.23% |
+No velocity feature is added to the approved Phase 4 feature set.
 
-| \*\*Total\*\* | \*\*526\*\* | \*\*100%\*\* |
+---
 
+## 12. Candidate Evidence Consolidation
 
+The Phase 4 candidate evidence package consolidates the available evaluation and error-analysis outputs.
 
-\### RF-300 Scenario Results
+### Candidate Evidence Coverage
 
+The candidate evidence package contains five candidate records:
 
+1. `LR_Original_C_0.01`
+2. `RF_Balanced_100_None_1`
+3. `RF_Balanced_300_None_1`
+4. `LR_Balanced_C_10`
+5. `Controlled_XGBoost`
 
-| Scenario | Total Fraud | TP | FN | Detection Rate |
+Supporting coverage includes:
 
-|---|---:|---:|---:|---:|
+| Evidence Artifact | Candidate Coverage |
+|---|---:|
+| Transaction predictions | 4 candidates |
+| False negatives | 4 candidates |
+| FN feature analysis | 4 candidates |
+| False positives | 3 candidates |
+| FP feature analysis | 3 candidates |
+| Scenario analysis | 4 candidates |
+| Candidate evidence | 5 candidates |
 
-| Scenario 1 | 43 | 43 | 0 | 100.00% |
+The controlled XGBoost candidate remains represented in the aggregate candidate evidence, while its transaction-level and scenario-level evidence is explicitly bounded by the artifacts available.
 
-| Scenario 2 | 324 | 1 | 323 | 0.31% |
+---
 
-| Scenario 3 | 159 | 79 | 80 | 49.69% |
+## 13. MLflow and Reproducibility Verification
 
+### 13.1 Controlled XGBoost MLflow Evidence
 
+The controlled XGBoost experiment was logged to:
 
-\### Scenario 2 Observation
+```text
+Experiment:
+financial_fraud_detection_phase4_controlled_xgboost
 
-Scenario 2 represents 324 of the 526 fraud transactions in the evaluation dataset. RF-300 detected 1 of the 324 Scenario 2 fraud transactions and missed 323.
+Experiment ID:
+973447774010422392
 
+Run ID:
+3bfe6002d0fe49e68597ba0ad89b818c
 
+Model ID:
+m-ce7a1fe747c142c3aa514bc5ef01f766
 
-Of the 403 total RF-300 false negatives, 323 were Scenario 2 transactions:
+Model Name:
+controlled_xgboost_model
 
+Model Status:
+READY
+```
 
+The logged model was loaded successfully and inference was verified on five known April 25–30 rows.
 
-`323 / 403 = 80.15%`
+### 13.2 Experiment Provenance
 
+The controlled XGBoost experiment source commit was:
 
+```text
+0a35d56426c4f546a08ed15205f2e08b098feaea
+```
 
-This is an important evaluation finding and requires further investigation. The current analysis does not establish the underlying cause of the Scenario 2 detection behavior.
+Short form:
 
+```text
+0a35d56
+```
 
+The later MLflow serialization fix was recorded in:
 
-\## 8. Feature-Level Error Analysis
+```text
+843bb87
+```
 
-Feature-level analysis was performed for false-negative and false-positive transactions to identify observed patterns in model errors.
+The fix affected model logging configuration only. The model configuration and experiment results were not changed, and the experiment was not rerun.
 
+---
 
+## 14. Feast Sequencing and Data Usage
 
-The analysis is descriptive and does not establish that a particular feature caused a transaction to be classified incorrectly.
+Feast retrieval was verified for the approved feature set.
 
+### 14.1 Historical Retrieval
 
+Historical Feast retrieval was verified for the training and validation datasets.
 
-Generated analysis files:
+The retrieved features matched the Phase 3 feature outputs with:
 
-\- `reports/phase4/phase4\_fn\_feature\_analysis.csv`
+```text
+Maximum absolute difference = 0
+```
 
-\- `reports/phase4/phase4\_fp\_feature\_analysis.csv`
+This verified consistency between the Feast historical retrieval and the corresponding Phase 3 feature outputs.
 
+### 14.2 Online Retrieval
 
+Online Feast retrieval was verified using known April transaction data.
 
-Transaction-level predictions:
+The behavioral features respected the temporal requirement:
 
-\- `reports/phase4/phase4\_transaction\_predictions.csv`
+```text
+previous_time < current_time
+```
 
+This verified that the behavioral feature retrieval did not use the current transaction itself when constructing historical context.
 
+### 14.3 May Data Usage Boundary
 
-\## 9. Phase 4 Evidence Files
+May 1–19 had previously been accessed for technical Feast validation, but was excluded from:
 
-The Phase 4 evaluation package contains:
+- Model selection
+- Feature selection
+- Threshold selection
+- Hyperparameter selection
+- Champion selection
 
-\- `reports/phase4/phase4\_candidate\_evidence.csv` — candidate configurations, metrics, confusion-matrix values and scenario evidence.
+The May dataset was therefore not used as the final Phase 4 evaluation dataset.
 
-\- `reports/phase4/phase4\_transaction\_predictions.csv` — transaction-level predictions and probabilities.
+---
 
-\- `reports/phase4/phase4\_false\_negatives.csv` — false-negative transactions.
+## 15. Evidence Package
 
-\- `reports/phase4/phase4\_false\_positives.csv` — false-positive transactions.
+The following Phase 4 evidence artifacts were verified:
 
-\- `reports/phase4/phase4\_fn\_feature\_analysis.csv` — feature-level false-negative analysis.
+```text
+reports/phase4/phase4_candidate_evidence.csv
+reports/phase4/phase4_transaction_predictions.csv
+reports/phase4/phase4_false_negatives.csv
+reports/phase4/phase4_fn_feature_analysis.csv
+reports/phase4/phase4_false_positives.csv
+reports/phase4/phase4_fp_feature_analysis.csv
+reports/phase4/phase4_scenario_analysis.csv
+reports/phase4/controlled_xgboost/provenance.json
+reports/phase4/controlled_xgboost/threshold_results.csv
+```
 
-\- `reports/phase4/phase4\_fp\_feature\_analysis.csv` — feature-level false-positive analysis.
+Supporting scripts verified include:
 
-\- `reports/phase4/phase4\_scenario\_analysis.csv` — scenario-level detection results for all four candidates.
+```text
+scripts/analyze_phase4_fn.py
+scripts/analyze_phase4_fn_features.py
+scripts/analyze_phase4_fp.py
+scripts/analyze_phase4_scenarios.py
+scripts/create_phase4_candidate_evidence.py
+scripts/error_analysis_phase4.py
+scripts/evaluate_phase4_candidates.py
+scripts/generate_phase4_scenario_analysis.py
+scripts/run_controlled_xgboost_phase4.py
+scripts/screen_xgboost_phase4.py
+scripts/threshold_analysis_phase4.py
+scripts/train_phase4.py
+scripts/tune_phase4.py
+```
 
+---
 
+## 16. Champion Selection Boundary
 
-\## 10. Reproducibility and Validation
+Phase 4 is a **pre-Champion evaluation and evidence-consolidation stage**.
 
-The four-candidate evaluation was reproduced using:
+This document does not:
 
+- Declare a Champion
+- Identify a best-performing model
+- Rank candidates
+- Freeze a Champion
+- Perform final Champion training
+- Perform final May 1–19 Champion evaluation
+- Make production-readiness claims
 
+The candidate evidence is intended for team review and subsequent Champion discussion.
 
-`scripts/evaluate\_phase4\_candidates.py`
+The subsequent workflow is:
 
+```text
+Phase 4 Candidate Evaluation
+        ↓
+Team Champion Selection
+        ↓
+Champion Freeze
+        ↓
+Final Champion Training / Governance
+        ↓
+May 1–19 Final Champion Evaluation
+        ↓
+Final Validation / Governance
+        ↓
+Production / Deployment / Monitoring
+```
 
+Only activities that are actually implemented and verified should be documented in the subsequent phases.
 
-Candidate evidence was generated and validated using:
+---
 
+## 17. Phase 4 Handoff
 
+Phase 4 hands off the following evidence for team review:
 
-`scripts/create\_phase4\_candidate\_evidence.py`
+- Candidate configuration details
+- Candidate-specific thresholds
+- Aggregate evaluation metrics
+- Controlled RF-300 experiment
+- Controlled XGBoost experiment
+- False-negative analysis
+- False-positive analysis
+- Feature-level error analysis
+- Scenario-level analysis
+- MLflow reproducibility evidence
+- Feast retrieval verification
+- Candidate evidence artifacts
+- Explicit evidence boundaries and unresolved historical diagnostics
 
+The handoff does not include a Champion decision.
 
+---
 
-Scenario analysis was generated using:
+## 18. Documentation Status
 
+Phase 4 documentation is considered complete for team review after:
 
+1. The documented candidate and error-analysis evidence has been verified.
+2. The controlled XGBoost evidence boundary has been documented.
+3. Historical diagnostics that could not be reproduced or traced have been excluded from verified evidence.
+4. Feast sequencing and May-data usage boundaries have been documented.
+5. The evidence package has been consolidated.
+6. Documentation formatting and Git diff checks have been completed.
 
-`scripts/generate\_phase4\_scenario\_analysis.py`
+No additional Phase 4 experiment, XGBoost rerun, Scenario 2 investigation, Feast work, or restructuring is required for this documentation handoff.
 
+---
 
+## 19. Phase 4 Scope Boundary
 
-The scenario-analysis generator is present in the repository at:
+Phase 4 covers:
 
+```text
+Candidate Evaluation
+        +
+Threshold Methodology
+        +
+Controlled Experiments
+        +
+Error Analysis
+        +
+Scenario Analysis
+        +
+Reproducibility Verification
+        +
+Evidence Consolidation
+        +
+Pre-Champion Handoff
+```
 
+The following remain outside Phase 4:
 
-`scripts/generate\_phase4\_scenario\_analysis.py`
+```text
+Champion Selection
+Champion Freeze
+Final Champion Training
+May 1–19 Final Champion Evaluation
+Final Production Validation
+Deployment
+Production Automation
+Production Monitoring
+```
 
-
-
-Error analysis was updated to include RF-300 using:
-
-
-
-`scripts/error\_analysis\_phase4.py`
-
-
-
-Validation checks confirmed:
-
-\- All four candidates were evaluated.
-
-\- Evaluation dataset shape and fraud count were consistent.
-
-\- Confusion-matrix counts were internally consistent.
-
-\- Scenario totals matched the expected fraud count: S1 = 43, S2 = 324, S3 = 159, total = 526.
-
-\- RF-300 false-positive count was 0.
-
-\- May data was not used for model selection or tuning.
-
-\- The updated candidate evidence and scenario analysis contain RF-300 results.
-
-
-
-\## 11. Limitations
-
-1\. Evaluation was performed on the fixed April 25–30 period.
-
-2\. May 1–19 data was excluded from model selection and tuning.
-
-3\. Scenario analysis is descriptive.
-
-4\. Feature-level error analysis does not establish causation.
-
-5\. The RF-100 → RF-300 experiment changed only `n\_estimators`.
-
-6\. The RF experiment retained the fixed threshold of 0.65.
-
-7\. Scenario 2 detection remains an unresolved investigation point.
-
-8\. No additional model or threshold experiment is included after the RF-300 controlled evaluation.
-
-9\. Champion selection has not been finalized.
-
-
-
-\## 12. Phase 4 Status and Handoff
-
-The Phase 4 evaluation responsibility is considered complete for the current candidate-evaluation stage.
-
-
-
-The completed package contains:
-
-\- Four-candidate evaluation
-
-\- RF-100 → RF-300 controlled experiment
-
-\- Transaction-level predictions
-
-\- False-negative analysis
-
-\- False-positive analysis
-
-\- Feature-level error analysis
-
-\- Scenario analysis
-
-\- Candidate evidence
-
-\- Reproducibility and validation checks
-
-
-
-The evidence is ready for team review and handoff.
-
-
-
-Further model investigation, including investigation of Scenario 2/3 behavior and any additional controlled experiments, should be performed as a subsequent team activity if justified by the evidence.
-
-
-
-\### Champion Status
-
-\*\*Champion selection: Pending team decision.\*\*
-
-
-
-This document does not designate a Champion or rank the candidates.
-
-
-
-\## 13. Phase 4 Handoff Boundary
-
-Diya's current Phase 4 evaluation responsibility ends after:
-
-1\. Final repository verification
-
-2\. Verification of the Phase 4 documentation and evidence
-
-3\. Commit and push of the intended Phase 4 changes
-
-4\. Handoff of the evaluation package to the team
-
-
-
-Further investigation or experimentation after this handoff is a subsequent team activity and is not part of the completed Phase 4 evaluation package documented here.
-
+These activities should be documented only when they are subsequently performed and verified.
