@@ -167,8 +167,7 @@ Dataset sizes:
 | April 1–12 | 114,978 | 114,610 | 368 |
 | April 13–18 | 57,525 | 57,176 | 349 |
 
-After threshold selection, each of the three Round 1 carry-forward candidates was retrained using the complete April 1–24 training period before evaluation on April 25–30. RF-300 reused the RF-100 threshold of 0.65, while controlled XGBoost used its separately selected threshold of 0.86.
-
+The three Round 1 carry-forward candidates were retrained using the complete April 1–24 training period before evaluation on April 25–30. The subsequently added RF-300 controlled candidate reused the RF-100 threshold of 0.65, while controlled XGBoost used its separately selected threshold of 0.86.
 ### 4.2 Selected Thresholds
 
 | Candidate | Selected Threshold |
@@ -730,3 +729,73 @@ Production Monitoring
 ```
 
 These activities should be documented only when they are subsequently performed and verified.
+
+
+---
+
+## 20. Post-Phase 4 Champion Decision and Freeze
+
+Following the Phase 4 candidate evaluation and team review, the team unanimously selected the following candidate as the project Champion:
+
+```text
+Candidate: RF_Balanced_300_None_1
+
+Model:
+Random Forest
+
+Configuration:
+n_estimators=300
+max_depth=None
+min_samples_leaf=1
+class_weight=balanced
+random_state=42
+n_jobs=-1
+
+Operating threshold:
+0.65
+```
+
+The decision considered the verified Phase 4 candidate evidence, including fraud detection effectiveness, false-positive burden, PR-AUC, F1, ROC-AUC, confusion-matrix counts, and scenario-level evidence. Evidence completeness and reproducibility were applied as the agreed eligibility/traceability condition.
+The decision did not involve a new experiment, retraining, threshold change, feature change, or additional XGBoost experiment.
+
+### 20.1 Frozen Evaluation Evidence
+
+The verified Phase 4 evaluation evidence for RF Balanced 300 on the April 25–30 evaluation period is:
+
+| Metric    | RF Balanced 300 |
+| --------- | --------------: |
+| PR-AUC    |        0.257441 |
+| ROC-AUC   |        0.637033 |
+| Recall    |        0.233840 |
+| Precision |        1.000000 |
+| F1        |        0.379045 |
+| FPR       |               0 |
+| TP        |             123 |
+| FP        |               0 |
+| TN        |          57,241 |
+| FN        |             403 |
+
+Scenario evidence:
+
+| Scenario | Detected | Total Fraud | Detection Rate |
+| -------- | -------: | ----------: | -------------: |
+| S1       |       43 |          43 |        100.00% |
+| S2       |        1 |         324 |          0.31% |
+| S3       |       79 |         159 |         49.69% |
+
+### 20.2 Champion Freeze Boundary
+
+The Champion Freeze establishes the selected model configuration and operating threshold for subsequent implementation.
+
+It does not by itself constitute:
+
+* Final Champion retraining
+* May 1–19 final Champion evaluation
+* Final production validation
+* Deployment
+* Production automation
+* Production monitoring
+
+Those activities remain pending until they are actually implemented and verified.
+
+The existing Phase 4 candidate evidence remains the source of record for the documented candidate evaluation.
