@@ -1,0 +1,104 @@
+May Isolated Evaluation Verification
+====================================
+
+Purpose
+-------
+A fresh isolated Feast environment was created to independently reproduce
+the existing committed May Champion evaluation without modifying the
+existing Feast store, Champion, threshold, or committed evaluation evidence.
+
+Team Approval
+-------------
+The team reviewed the fresh isolated May evaluation and approved cleanup
+of the temporary isolated environment after verification.
+
+Frozen Evaluation Configuration
+--------------------------------
+Champion: RandomForestClassifier
+n_estimators: 300
+max_depth: None
+min_samples_leaf: 1
+class_weight: balanced
+random_state: 42
+Approved features: 10
+Threshold: 0.65
+May transactions evaluated: 182,429
+May fraud transactions: 1,633
+
+Fresh Isolated Evaluation
+-------------------------
+A separate Feast environment was created at:
+
+feast_repo\may_final_isolated
+
+The isolated Feast Online Store was initially verified as empty before
+May data was populated.
+
+May data was processed using the approved May feature-processing workflow
+with the strict previous_time < current_time rule.
+
+May processed dataset:
+- Transactions: 182,429
+- Duplicate transaction IDs: 0
+- Missing values: 0
+
+The isolated Feast Online Store was populated with the May transaction
+features and the ten approved model features.
+
+Fresh evaluation completed using the frozen RF-300 Champion and threshold
+0.65.
+
+Fresh evaluation metrics:
+- Recall: 0.23759951010410288
+- Precision: 0.9923273657289002
+- F1: 0.383399209486166
+- PR-AUC: 0.2553562939648593
+- ROC-AUC: 0.6263909435835407
+- Accuracy: 0.9931589823986318
+- FPR: 1.6593287462111994e-05
+- TP: 388
+- FP: 3
+- TN: 180793
+- FN: 1245
+
+Independent Reproduction Result
+-------------------------------
+The fresh isolated evaluation reproduced the existing committed May
+prediction and metrics evidence exactly.
+
+Prediction artifact SHA-256:
+a03590592605764c96e543366efe6eccb99d21317a5cb9ef678497f43ac96bff
+
+Metrics artifact SHA-256:
+ab9e31f6ec18c04f5178657eb840f04cd2fcb22da0ebe4e445e378d7250a0258
+
+The fresh prediction artifact and existing committed prediction artifact
+have identical SHA-256 hashes.
+
+The fresh metrics artifact and existing committed metrics artifact have
+identical SHA-256 hashes.
+
+The fresh evaluation generated predictions using the frozen RF-300 model's
+predict_proba output and threshold 0.65. No retraining, tuning, Champion
+change, feature change, XGBoost rerun, or Phase 4 rerun was performed.
+
+Existing State Protection
+-------------------------
+The existing Feast Online Store was not modified during the isolated
+verification.
+
+The existing committed May evaluation evidence was not modified.
+
+The isolated environment was created separately for verification and is
+temporary.
+
+Conclusion
+----------
+The fresh isolated May evaluation independently reproduced the existing
+committed May prediction and metrics evidence exactly.
+
+The team approved cleanup of the temporary isolated environment after
+this verification.
+
+The existing Feast store, Champion, threshold, and committed evaluation
+evidence remain unchanged.
