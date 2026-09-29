@@ -173,7 +173,20 @@ def consume_once(timeout_seconds=15):
         if message.error():
             raise KafkaException(message.error())
 
-        return handle_message(consumer, message)
+        try:
+            return handle_message(consumer, message)
+        except ValueError as exc:
+            LOGGER.error(
+                "Rejected invalid transaction at topic=%s "
+                "partition=%s offset=%s: %s. "
+                "Consumer run stopped; offset not committed.",
+                message.topic(),
+                message.partition(),
+                message.offset(),
+                exc,
+            )
+            raise
+
 
     finally:
         consumer.close()
