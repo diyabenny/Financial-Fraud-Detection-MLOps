@@ -34,8 +34,8 @@ from src.prediction_storage import (
 # ---------------------------------------------------------
 # Paths
 # ---------------------------------------------------------
-FEAST_REPO_PATH = r"feast_repo\fraud_features\feature_repo"
-MODEL_PATH = r"artifacts\rf300_champion\model.skops"
+FEAST_REPO_PATH = Path("feast_repo") / "fraud_features" / "feature_repo"
+MODEL_PATH = Path("artifacts") / "rf300_champion" / "model.skops"
 THRESHOLD = 0.65
 
 

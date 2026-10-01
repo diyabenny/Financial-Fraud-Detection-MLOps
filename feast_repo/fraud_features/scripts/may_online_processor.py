@@ -7,8 +7,10 @@ from collections import defaultdict
 # PROJECT DATA PATHS
 # ============================================================
 
-APRIL_TRAIN_PATH = r"data\phase3\train_combined_features.csv"
-APRIL_VALIDATION_PATH = r"data\phase3\validation_combined_features.csv"
+from pathlib import Path
+
+APRIL_TRAIN_PATH = Path("data") / "phase3" / "train_combined_features.csv"
+APRIL_VALIDATION_PATH = Path("data") / "phase3" / "validation_combined_features.csv"
 MAY_SOURCE_PATH = r"data\incoming\may\converted_may_file.csv"
 
 
