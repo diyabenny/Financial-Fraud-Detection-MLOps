@@ -69,3 +69,50 @@ def get_prediction(transaction_id: int) -> int | None:
         ).fetchone()
 
     return result[0] if result else None
+
+def get_prediction_summary() -> dict[str, int]:
+    """Return a summary of stored fraud predictions.
+
+    Returns:
+        A dictionary containing the total number of stored predictions,
+        the number of fraud predictions, and the number of normal
+        predictions.
+
+    Raises:
+        ValueError: If the fraud and normal prediction counts do not
+            add up to the total prediction count.
+    """
+    with sqlite3.connect(DATABASE_PATH) as connection:
+        total_predictions = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM predictions
+            """
+        ).fetchone()[0]
+
+        fraud_predictions = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM predictions
+            WHERE prediction = 1
+            """
+        ).fetchone()[0]
+
+        normal_predictions = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM predictions
+            WHERE prediction = 0
+            """
+        ).fetchone()[0]
+
+    if fraud_predictions + normal_predictions != total_predictions:
+        raise ValueError(
+            "Prediction summary counts do not match the total prediction count."
+        )
+
+    return {
+        "total_predictions": total_predictions,
+        "fraud_predictions": fraud_predictions,
+        "normal_predictions": normal_predictions,
+    }
