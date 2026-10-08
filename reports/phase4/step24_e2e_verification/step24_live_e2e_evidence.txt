@@ -1,0 +1,344 @@
+STEP 24 — CONTROLLED LIVE KAFKA → INFERENCE → STORAGE E2E VERIFICATION
+======================================================================
+
+Status: VERIFIED
+
+Purpose
+-------
+This evidence record documents the controlled live verification of the
+implemented Kafka-to-inference-to-storage path using one approved
+transaction.
+
+The verification was performed without changing the frozen Champion,
+approved feature set, preprocessing, threshold, or model configuration.
+
+
+1. VERIFIED GIT BASELINE
+------------------------
+
+Branch:
+swathi
+
+HEAD:
+5bc1c0e
+
+HEAD commit:
+Integrate Kafka consumer with inference and storage
+
+Kafka integration commit ancestry:
+KAFKA_COMMIT_IN_COMMON_CHECK
+
+The Kafka integration commit is present in origin/common-check.
+
+Final Git status contained only the following known intentional
+untracked runtime artifacts:
+
+?? artifacts/
+?? data/prediction_storage.db
+?? rf300_champion_verified_artifact.zip
+
+No unexpected tracked or staged project changes were present.
+
+
+2. KAFKA INFRASTRUCTURE
+-----------------------
+
+Existing local Kafka configuration was used.
+
+Kafka container:
+fraud-local-kafka
+
+Kafka image:
+apache/kafka:4.3.0
+
+Kafka broker:
+127.0.0.1:9092
+
+Topic:
+fraud-transactions
+
+Topic configuration observed:
+- Partitions: 1
+- Replication factor: 1
+- Leader: 1
+- In-sync replica: 1
+- min.insync.replicas: 1
+
+The existing local Kafka compose configuration was used.
+No production infrastructure claim is made from this verification.
+
+
+3. CONTROLLED TEST TRANSACTION
+------------------------------
+
+TRANSACTION_ID:
+288063
+
+TX_DATETIME:
+2018-05-01 00:01:48
+
+CUSTOMER_ID:
+206
+
+TERMINAL_ID:
+3521
+
+TX_AMOUNT:
+18.60
+
+This transaction was selected from the available May input data for
+controlled technical validation.
+
+May data was not used for model training, feature selection, threshold
+selection, tuning, or Champion selection.
+
+
+4. PRODUCER VERIFICATION
+------------------------
+
+The existing Kafka producer was invoked using the controlled transaction.
+
+Observed delivery result:
+
+Delivered to fraud-transactions, partition 0, offset 0
+
+Therefore:
+
+Producer
+    ↓
+fraud-transactions
+    ↓
+partition 0
+    ↓
+offset 0
+
+
+5. CONSUMER VERIFICATION
+------------------------
+
+The consumer was invoked using the command actually executed during
+the controlled live verification:
+
+python -m ingestion.kafka_consumer --consume-once
+
+The consumer successfully received the existing Kafka message and
+processed transaction 288063.
+
+The consumer used the existing downstream inference path:
+
+Kafka consumer
+    ↓
+message validation / normalization
+    ↓
+process_new_transaction()
+    ↓
+Feast feature processing
+    ↓
+frozen RF300 Champion
+    ↓
+threshold = 0.65
+    ↓
+prediction storage
+
+
+6. LIVE INFERENCE RESULT
+------------------------
+
+Observed processing result:
+
+Processed transaction 288063:
+probability=0.006666666666666667
+prediction=0
+stored_prediction=0
+
+Therefore:
+
+TRANSACTION_ID:
+288063
+
+Probability:
+0.006666666666666667
+
+Prediction:
+0
+
+Stored prediction:
+0
+
+
+7. KAFKA COMMIT VERIFICATION
+----------------------------
+
+Observed result:
+
+Processed and committed
+topic=fraud-transactions
+partition=0
+offset=0
+
+Final consumer output:
+
+SUCCESS: processed and committed transaction 288063
+
+This confirms that the consumer committed the Kafka message only after
+successful downstream processing.
+
+
+8. DATABASE READ-BACK VERIFICATION
+----------------------------------
+
+Database read-back confirmed:
+
+TRANSACTION_288063_STORED_PREDICTION:
+(288063, 0)
+
+Therefore:
+
+Inference prediction:
+0
+
+Stored prediction:
+0
+
+Database read-back:
+0
+
+The prediction and stored prediction were equal.
+
+
+9. FROZEN CHAMPION VERIFICATION
+-------------------------------
+
+Champion model path:
+
+artifacts/rf300_champion/model.skops
+
+Threshold:
+
+0.65
+
+Champion model SHA-256:
+
+a28e5e10dbe7478f1f446b8fd55fc9457984f0f3b719371bb0934e63fa58ed83
+
+The SHA-256 value matched the approved frozen Champion artifact.
+
+No model retraining, Champion replacement, threshold modification,
+feature modification, or preprocessing modification was performed as
+part of this verification.
+
+
+10. DEPENDENCY VERIFICATION
+---------------------------
+
+Approved Kafka dependency:
+
+confluent-kafka==2.16.0
+
+The dependency was present in requirements.txt.
+
+
+11. OBSERVED WARNINGS
+---------------------
+
+The live verification produced the following non-blocking runtime
+observations:
+
+1. IPv6 connection warnings were observed while attempting
+   localhost/::1:9092 before successful broker communication.
+
+2. A NumPy timedelta deprecation warning was observed during Feast
+   processing.
+
+3. Feast registry/cache refresh output was observed.
+
+These observations did not prevent successful message processing,
+inference, storage, database read-back, or Kafka offset commit.
+
+No configuration change was made in response to these warnings during
+this verification.
+
+
+12. FINAL VERIFIED PATH
+-----------------------
+
+The controlled live transaction successfully traversed:
+
+Producer
+    ↓
+Kafka topic: fraud-transactions
+    ↓
+Consumer
+    ↓
+validation / normalization
+    ↓
+existing process_new_transaction()
+    ↓
+Feast feature processing
+    ↓
+frozen RF300 Champion
+    ↓
+threshold 0.65
+    ↓
+prediction = 0
+    ↓
+prediction storage
+    ↓
+database read-back = 0
+    ↓
+Kafka offset 0 committed
+
+
+13. SCOPE AND LIMITATIONS
+-------------------------
+
+This verification establishes the controlled live execution of the
+Kafka → consumer → existing inference → prediction storage path for
+transaction 288063 in the local Kafka environment.
+
+This evidence does NOT claim:
+
+- production-scale Kafka verification
+- multi-transaction or load testing
+- S3 → Kafka live end-to-end verification
+- Docker → Kafka → inference live integration
+- FastAPI → Kafka live integration
+- automatic retraining
+- automatic candidate promotion
+- automatic Champion replacement
+- production monitoring validation
+- production deployment readiness
+
+The verification was intentionally limited to one controlled transaction
+and the existing local Kafka environment.
+
+
+14. FINAL VERDICT
+-----------------
+
+CONTROLLED LIVE KAFKA → INFERENCE → STORAGE E2E VERIFIED
+
+Transaction 288063 was successfully:
+
+published to Kafka
+→ consumed
+→ processed through the existing inference path
+→ evaluated using the frozen RF300 Champion at threshold 0.65
+→ stored with prediction 0
+→ read back from the prediction database as 0
+→ followed by successful Kafka offset commit.
+
+
+15. REVIEW STATUS
+-----------------
+
+Avani:
+APPROVED
+
+Diya:
+APPROVED
+
+Swathi:
+Verification executed and evidence finalized after team review.
+
+No further Kafka execution is required for this verification.
