@@ -581,7 +581,19 @@ Swathi: APPROVED
 Checkpoint 11 evidence record:
 APPROVED
 
-Step 22 overall closure remains pending:
+Step 22 overall closure:
 
-- Checkpoint 12 — Avani cross-check
-- Checkpoint 13 — Git review
+- Checkpoint 12 — Avani cross-check: APPROVED
+- Checkpoint 13 — Git review: COMPLETED
+- Approved dependency: confluent-kafka==2.16.0
+- Kafka-related tests: 21/21 PASS
+
+POST-STEP 22 DEPENDENCY DECISION
+----------------------------------
+After Step 22, the team explicitly reviewed the unresolved confluent-kafka dependency.
+No exact project-established version was found in the existing repository evidence or history.
+The team explicitly approved the following version:
+confluent-kafka==2.16.0
+This version was selected by explicit team agreement, based on the version observed during Step 22 environment verification.
+The approval does not authorize any unrelated dependency, code, configuration, Champion, Feast, threshold, or Kafka-state changes.
+Approved next actions are limited to pinning this exact version, installing the same version, rerunning the blocked tests, reviewing the results, and reviewing the final Git diff/status before any commit.
