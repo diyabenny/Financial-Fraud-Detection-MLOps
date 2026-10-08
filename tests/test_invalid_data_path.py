@@ -7,6 +7,10 @@ from unittest.mock import Mock, patch
 from ingestion.kafka_consumer import consume_once, handle_message
 
 
+HISTORY = Mock()
+MODEL = Mock()
+
+
 VALID_PAYLOAD = {
     "TRANSACTION_ID": 288062,
     "TX_DATETIME": "2018-05-01 00:01:21",
@@ -45,7 +49,12 @@ class TestInvalidDataPath(unittest.TestCase):
             "ingestion.kafka_consumer.process_transaction"
         ) as process:
             with self.assertRaises(ValueError):
-                handle_message(consumer, make_message(payload=payload))
+                handle_message(
+                    consumer,
+                    make_message(payload=payload),
+                    HISTORY,
+                    MODEL,
+                )
 
             process.assert_not_called()
 
@@ -57,7 +66,12 @@ class TestInvalidDataPath(unittest.TestCase):
 
         consumer = Mock()
         with self.assertRaises(ValueError):
-            handle_message(consumer, make_message(payload=payload))
+            handle_message(
+                consumer,
+                make_message(payload=payload),
+                HISTORY,
+                MODEL,
+            )
 
         consumer.commit.assert_not_called()
 
@@ -67,7 +81,12 @@ class TestInvalidDataPath(unittest.TestCase):
 
         consumer = Mock()
         with self.assertRaises(ValueError):
-            handle_message(consumer, make_message(payload=payload))
+            handle_message(
+                consumer,
+                make_message(payload=payload),
+                HISTORY,
+                MODEL,
+            )
 
         consumer.commit.assert_not_called()
 
@@ -78,6 +97,8 @@ class TestInvalidDataPath(unittest.TestCase):
             handle_message(
                 consumer,
                 make_message(key=b"999999"),
+                HISTORY,
+                MODEL,
             )
 
         consumer.commit.assert_not_called()
@@ -89,6 +110,8 @@ class TestInvalidDataPath(unittest.TestCase):
             handle_message(
                 consumer,
                 make_message(raw_value=b'{"TRANSACTION_ID":'),
+                HISTORY,
+                MODEL,
             )
 
         consumer.commit.assert_not_called()
@@ -133,9 +156,18 @@ class TestInvalidDataPath(unittest.TestCase):
         with patch(
             "ingestion.kafka_consumer.process_transaction"
         ) as process:
-            result = handle_message(consumer, message)
+            result = handle_message(
+                consumer,
+                message,
+                HISTORY,
+                MODEL,
+            )
 
-            process.assert_called_once_with(VALID_PAYLOAD)
+            process.assert_called_once_with(
+                VALID_PAYLOAD,
+                HISTORY,
+                MODEL,
+            )
 
         self.assertEqual(result, VALID_PAYLOAD)
         consumer.commit.assert_called_once_with(

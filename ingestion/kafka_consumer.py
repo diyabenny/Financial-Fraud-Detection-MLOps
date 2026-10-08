@@ -1,16 +1,23 @@
-
 """Step 9: Kafka consumer with validation and manual offset commits.
 
-Consumes existing transactions only. Does not publish or run inference.
+Consumes existing transactions and runs the approved downstream
+inference/storage path.
 """
 
 import argparse
 import json
 import logging
 
+import pandas as pd
 from confluent_kafka import Consumer, KafkaException
 
 from ingestion.kafka_producer import BROKER, TOPIC, validate_payload
+from feast_repo.fraud_features.scripts.online_prediction import (
+    load_april_history,
+    load_champion_model,
+    process_new_transaction,
+)
+from src.prediction_storage import initialize_database
 
 
 GROUP_ID = "fraud-inference-group"
@@ -71,35 +78,58 @@ def decode_transaction(message):
     return payload
 
 
-def process_transaction(payload):
-    """Perform the approved Step 9 transport-processing demonstration.
+def process_transaction(payload, history, model):
+    """Run the existing approved inference and prediction-storage path.
 
     Args:
         payload: A transaction already validated against the Kafka contract.
+        history: Existing April transaction history used for leakage-safe
+            feature calculation.
+        model: Frozen RF300 Champion model.
 
     Returns:
-        None after the transaction is logged successfully.
+        The result returned by the existing inference path.
 
     Raises:
-        Exceptions from logging or processing if the operation fails.
+        Exceptions from feature calculation, Feast, model inference,
+        prediction storage, or read-back verification.
 
     Side effects:
-        Logs the validated transaction. Does not run model inference.
+        Runs the existing downstream inference and prediction-storage path.
     """
-    LOGGER.info(
-        "Validated transaction %s, customer %s, amount %s",
-        payload["TRANSACTION_ID"],
-        payload["CUSTOMER_ID"],
-        payload["TX_AMOUNT"],
+    transaction = payload.copy()
+    transaction["TX_DATETIME"] = pd.Timestamp(
+        transaction["TX_DATETIME"]
     )
 
+    result, probability, prediction, stored_prediction = (
+        process_new_transaction(
+            transaction,
+            history,
+            model,
+        )
+    )
 
-def handle_message(consumer, message):
+    LOGGER.info(
+        "Processed transaction %s: probability=%s prediction=%s "
+        "stored_prediction=%s",
+        transaction["TRANSACTION_ID"],
+        probability,
+        prediction,
+        stored_prediction,
+    )
+
+    return result
+
+
+def handle_message(consumer, message, history, model):
     """Process one Kafka message and commit its offset after success.
 
     Args:
         consumer: The Kafka consumer that received the message.
         message: The Kafka message to process.
+        history: Existing April transaction history.
+        model: Frozen RF300 Champion model.
 
     Returns:
         The validated transaction after a successful synchronous commit.
@@ -107,14 +137,14 @@ def handle_message(consumer, message):
     Raises:
         ValueError: If the message violates the approved contract.
         KafkaException: If the synchronous offset commit fails.
-        Other exceptions raised during processing.
+        Other exceptions raised during downstream processing.
 
     Side effects:
-        Processes the transaction and synchronously commits its offset
-        only after processing succeeds.
+        Runs downstream inference/storage and synchronously commits its
+        offset only after successful processing.
     """
     payload = decode_transaction(message)
-    process_transaction(payload)
+    process_transaction(payload, history, model)
 
     # The explicit message commits offset + 1 for this partition.
     consumer.commit(message=message, asynchronous=False)
@@ -140,13 +170,19 @@ def consume_once(timeout_seconds=15):
     Raises:
         KafkaException: If Kafka reports an error.
         ValueError: If the received message fails validation.
-        Other exceptions raised by processing or offset commit.
+        Other exceptions raised by downstream processing or offset commit.
 
     Side effects:
-        Joins the approved consumer group, processes at most one message,
-        and commits only after successful processing. Always closes
-        the consumer. Does not publish messages.
+        Initializes prediction storage, loads the existing April history
+        and frozen Champion, joins the approved consumer group, processes
+        at most one message, and commits only after successful processing.
+        Always closes the consumer. Does not publish messages.
     """
+    initialize_database()
+
+    history = load_april_history()
+    model = load_champion_model()
+
     consumer = Consumer({
             "bootstrap.servers": "127.0.0.1:9092",
             "group.id": GROUP_ID,
@@ -174,7 +210,12 @@ def consume_once(timeout_seconds=15):
             raise KafkaException(message.error())
 
         try:
-            return handle_message(consumer, message)
+            return handle_message(
+                consumer,
+                message,
+                history,
+                model,
+            )
         except ValueError as exc:
             LOGGER.error(
                 "Rejected invalid transaction at topic=%s "
@@ -186,7 +227,6 @@ def consume_once(timeout_seconds=15):
                 exc,
             )
             raise
-
 
     finally:
         consumer.close()

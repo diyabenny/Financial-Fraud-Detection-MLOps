@@ -1,5 +1,4 @@
-
-"""Offline tests for the Step 9 Kafka consumer."""
+"""Offline tests for the Kafka consumer."""
 
 import json
 import unittest
@@ -18,6 +17,9 @@ VALID_PAYLOAD = {
     "TERMINAL_ID": 2944,
     "TX_AMOUNT": 18.71,
 }
+
+HISTORY = Mock()
+MODEL = Mock()
 
 
 def make_message(payload=None, key=b"288062", raw_value=None):
@@ -39,7 +41,10 @@ def make_message(payload=None, key=b"288062", raw_value=None):
 
 class TestKafkaConsumer(unittest.TestCase):
     def test_valid_message(self):
-        self.assertEqual(decode_transaction(make_message()), VALID_PAYLOAD)
+        self.assertEqual(
+            decode_transaction(make_message()),
+            VALID_PAYLOAD,
+        )
 
     def test_wrong_kafka_key(self):
         with self.assertRaises(ValueError):
@@ -48,30 +53,35 @@ class TestKafkaConsumer(unittest.TestCase):
     def test_missing_field(self):
         payload = VALID_PAYLOAD.copy()
         del payload["TX_AMOUNT"]
+
         with self.assertRaises(ValueError):
             decode_transaction(make_message(payload=payload))
 
     def test_extra_field(self):
         payload = VALID_PAYLOAD.copy()
         payload["IS_FRAUD"] = 0
+
         with self.assertRaises(ValueError):
             decode_transaction(make_message(payload=payload))
 
     def test_boolean_id(self):
         payload = VALID_PAYLOAD.copy()
         payload["TRANSACTION_ID"] = True
+
         with self.assertRaises(ValueError):
             decode_transaction(make_message(payload=payload))
 
     def test_invalid_timestamp(self):
         payload = VALID_PAYLOAD.copy()
         payload["TX_DATETIME"] = "2018-05-01T00:01:21Z"
+
         with self.assertRaises(ValueError):
             decode_transaction(make_message(payload=payload))
 
     def test_negative_amount(self):
         payload = VALID_PAYLOAD.copy()
         payload["TX_AMOUNT"] = -1
+
         with self.assertRaises(ValueError):
             decode_transaction(make_message(payload=payload))
 
@@ -80,7 +90,10 @@ class TestKafkaConsumer(unittest.TestCase):
             decode_transaction(
                 make_message(
                     raw_value=json.dumps(
-                        {**VALID_PAYLOAD, "TX_AMOUNT": float("nan")}
+                        {
+                            **VALID_PAYLOAD,
+                            "TX_AMOUNT": float("nan"),
+                        }
                     ).encode("utf-8")
                 )
             )
@@ -92,6 +105,7 @@ class TestKafkaConsumer(unittest.TestCase):
             b'"CUSTOMER_ID":3546,"TERMINAL_ID":2944,'
             b'"TX_AMOUNT":18.71}'
         )
+
         with self.assertRaises(ValueError):
             decode_transaction(make_message(raw_value=raw))
 
@@ -100,21 +114,40 @@ class TestKafkaConsumer(unittest.TestCase):
         consumer = Mock()
         message = make_message()
 
-        result = handle_message(consumer, message)
+        result = handle_message(
+            consumer,
+            message,
+            HISTORY,
+            MODEL,
+        )
 
         self.assertEqual(result, VALID_PAYLOAD)
-        mock_process.assert_called_once_with(VALID_PAYLOAD)
+
+        mock_process.assert_called_once_with(
+            VALID_PAYLOAD,
+            HISTORY,
+            MODEL,
+        )
+
         consumer.commit.assert_called_once_with(
-            message=message, asynchronous=False
+            message=message,
+            asynchronous=False,
         )
 
     @patch("ingestion.kafka_consumer.process_transaction")
     def test_no_commit_after_processing_failure(self, mock_process):
-        mock_process.side_effect = RuntimeError("Processing failed")
+        mock_process.side_effect = RuntimeError(
+            "Processing failed"
+        )
         consumer = Mock()
 
         with self.assertRaises(RuntimeError):
-            handle_message(consumer, make_message())
+            handle_message(
+                consumer,
+                make_message(),
+                HISTORY,
+                MODEL,
+            )
 
         consumer.commit.assert_not_called()
 
@@ -122,19 +155,35 @@ class TestKafkaConsumer(unittest.TestCase):
         consumer = Mock()
 
         with self.assertRaises(ValueError):
-            handle_message(consumer, make_message(key=b"wrong"))
+            handle_message(
+                consumer,
+                make_message(key=b"wrong"),
+                HISTORY,
+                MODEL,
+            )
 
         consumer.commit.assert_not_called()
 
     @patch("ingestion.kafka_consumer.process_transaction")
     def test_commit_failure_propagates(self, mock_process):
         consumer = Mock()
-        consumer.commit.side_effect = RuntimeError("Commit failed")
+        consumer.commit.side_effect = RuntimeError(
+            "Commit failed"
+        )
 
         with self.assertRaises(RuntimeError):
-            handle_message(consumer, make_message())
+            handle_message(
+                consumer,
+                make_message(),
+                HISTORY,
+                MODEL,
+            )
 
-        mock_process.assert_called_once()
+        mock_process.assert_called_once_with(
+            VALID_PAYLOAD,
+            HISTORY,
+            MODEL,
+        )
 
 
 if __name__ == "__main__":
