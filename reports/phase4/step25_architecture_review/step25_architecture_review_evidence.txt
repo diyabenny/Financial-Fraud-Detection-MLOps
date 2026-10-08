@@ -1,0 +1,130 @@
+STEP 25 — FINAL ARCHITECTURE / PROJECT-WIDE AUDIT
+================================================
+
+PURPOSE
+-------
+Read-only final architecture and project-wide audit of the implemented Financial Fraud Detection MLOps lifecycle. No live E2E rerun was performed during Step 25.
+
+CP0 — GIT BASELINE
+------------------
+Branch: diya
+HEAD / origin/diya / origin/common-check: 7a863f1
+Branch comparison: diya...origin/common-check = 0 ahead, 0 behind
+No tracked or staged changes were present during the audit.
+Known intentional untracked items:
+- artifacts/
+- data/prediction_storage.db
+- feast_repo/fraud_features/feature_repo/data/
+- feast_repo/fraud_features/scripts/online_prediction.py.bak
+- reports/phase4/may_champion_evaluation/
+
+CP1 — ARCHITECTURE / COMPONENT AUDIT
+-------------------------------------
+Inspected the existing producer, consumer, S3 ingestion/simulation, FastAPI, online prediction, Feast, prediction storage, and Docker paths.
+Kafka prediction-time payload contains exactly seven fields: TRANSACTION_ID, TX_DATETIME, CUSTOMER_ID, TERMINAL_ID, TX_AMOUNT, TX_TIME_SECONDS, and TX_TIME_DAYS. The Kafka payload excludes TX_FRAUD and TX_FRAUD_SCENARIO. FastAPI /predict uses a separate five-field request contract: TX_DATETIME, CUSTOMER_ID, TERMINAL_ID, TX_AMOUNT, and TX_TIME_DAYS, with extra fields rejected.
+S3 simulated ingestion uses the existing source data contract and incoming/may/ path.
+FastAPI delegates to the existing process_new_transaction workflow.
+No unnecessary architecture changes were introduced during Step 25.
+
+CP2 — CHAMPION VERIFICATION
+---------------------------
+Champion artifact: artifacts/rf300_champion/model.skops
+SHA-256:
+a28e5e10dbe7478f1f446b8fd55fc9457984f0f3b719371bb0934e63fa58ed83
+Verified model: RandomForestClassifier
+n_estimators=300
+max_depth=None
+min_samples_leaf=1
+class_weight=balanced
+random_state=42
+Champion identity and artifact remained unchanged.
+
+CP3 — FEATURE / FEAST CONTRACT
+------------------------------
+The online inference contract contains exactly these 10 approved features:
+TX_AMOUNT
+AMOUNT_LOG
+TX_HOUR
+TX_DAY_OF_WEEK
+TX_IS_WEEKEND
+TERMINAL_TX_COUNT_1D
+TERMINAL_TX_COUNT_7D
+TERMINAL_AVG_AMOUNT_7D
+CUSTOMER_TX_COUNT_1D
+CUSTOMER_TX_COUNT_7D
+Feast retrieval uses the transaction entity join key TRANSACTION_ID.
+Online inference excludes TX_FRAUD and TX_FRAUD_SCENARIO.
+Controlled Feast retrieval for transaction 288063 returned one row containing the required model features.
+
+CP4 — KAFKA CONTRACT / COMMIT SEMANTICS
+---------------------------------------
+Kafka topic: fraud-transactions
+Consumer group: fraud-inference-group
+Approved dependency: confluent-kafka==2.16.0
+Consumer uses manual commit behavior and commits synchronously only after successful processing.
+Validation or processing failures do not commit the message.
+The actual consumer delegates downstream inference to the existing process_new_transaction workflow.
+
+CP5 — INFERENCE / STORAGE PATH
+------------------------------
+process_new_transaction calculates leakage-safe features, builds exactly the approved 10 features, validates them, pushes to Feast, retrieves from Feast, runs frozen RF-300 inference, stores the prediction, reads it back, and verifies the stored prediction matches the inference result.
+Prediction storage uses SQLite with TRANSACTION_ID as the prediction key.
+
+CP6 — FASTAPI / DOCKER AUDIT
+----------------------------
+FastAPI is a thin layer over the existing inference workflow and uses the five-field online request contract with extra fields forbidden.
+Dockerfile provides the FastAPI container path and copies required source/data components.
+The Docker build context excludes the local artifacts directory and there is no runtime Champion-artifact download mechanism.
+Therefore Docker is not a standalone reproducible Champion-inference path; this is a documented reproducibility limitation, not evidence of Champion replacement.
+
+CP7 — DRIFT / RETRAINING / PROMOTION
+------------------------------------
+Step 16C current execution:
+Overall drift detected: False
+Retraining requested: False
+Action: KEEP_RF300_CHAMPION
+Crossing features: []
+Drift logic uses the approved 10-feature contract and PSI > 0.25 trigger.
+Step 19 promotion decision remains:
+Promotion decision: VERIFIED — UNDETERMINED; no promotion performed; Champion protected.
+No automatic Champion replacement exists in the verified lifecycle.
+
+CP8 — TEST / EVIDENCE / REPOSITORY AUDIT
+----------------------------------------
+Initial CP8 targeted test execution was blocked because confluent-kafka was not installed in the local .venv, although requirements.txt declared the approved version confluent-kafka==2.16.0. During the Step 25 audit, the already-approved exact dependency was installed in the local .venv, and the targeted tests were rerun successfully. This dependency installation was an audit-process deviation from the originally intended read-only dependency state and is recorded here explicitly:
+Prediction storage tests: 6/6 passed
+Invalid Kafka/data-path tests: 8/8 passed
+Kafka consumer tests: 13/13 passed
+Combined result: 27/27 passed
+ResourceWarnings about unclosed SQLite connections appeared in invalid-path tests but did not cause failures.
+The earlier test failure was confirmed to be a local .venv dependency-state mismatch; the required exact dependency was declared in requirements.txt and was installable for Python 3.13 Windows.
+No staged or tracked working-tree changes were present after verification.
+
+CP9 — DOCUMENTATION / SCOPE AUDIT
+---------------------------------
+Step 22 reproducibility evidence establishes reproducibility of the documented implemented lifecycle and records external/local reproducibility limitations.
+Step 24 evidence explicitly limits the live E2E verification to:
+Kafka → consumer → existing inference → prediction storage
+Step 24 does NOT establish live S3 → Kafka verification, Docker → Kafka → inference integration, FastAPI → Kafka integration, production-scale Kafka behavior, automatic retraining/promotion, or production deployment readiness.
+Step 23 CI/CD was not implemented under the agreed project scope and no Step 23 implementation commit was found.
+Step 19 remains UNDETERMINED and must not be reinterpreted as an automatic promotion failure.
+
+CP10 — FINAL CONTROLLED VERIFICATION
+------------------------------------
+Step 16C retraining trigger returned KEEP_RF300_CHAMPION with no drift.
+Champion loaded successfully through the actual online inference loader with the frozen RF-300 parameters.
+FEATURE_COLUMNS count: 10
+THRESHOLD: 0.65
+Feast retrieval for transaction 288063 returned one row.
+Model-only inference for transaction 288063:
+probability=0.006666666666666667
+prediction=0
+No prediction-storage mutation was performed by this model-only verification.
+Final Git status contained only the five known intentional untracked items listed in CP0.
+
+FINAL AUDIT CONCLUSION
+----------------------
+The implemented project lifecycle is internally consistent with the frozen Champion, approved 10-feature online contract, Feast path, Kafka consumer integration, prediction storage, FastAPI layer, drift/retraining trigger, and documented promotion decision.
+The authoritative live E2E evidence is limited to the verified Kafka → inference → storage path. Broader S3 → Kafka and production-deployment integrations remain outside the verified Step 24 scope.
+No Champion replacement, feature-contract change, threshold change, automatic promotion, or unnecessary infrastructure change was identified during Step 25.
+Step 25 is an audit/documentation closeout activity; it does not expand the previously verified E2E scope.
