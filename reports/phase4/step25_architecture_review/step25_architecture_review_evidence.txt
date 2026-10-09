@@ -128,3 +128,17 @@ The implemented project lifecycle is internally consistent with the frozen Champ
 The authoritative live E2E evidence is limited to the verified Kafka → inference → storage path. Broader S3 → Kafka and production-deployment integrations remain outside the verified Step 24 scope.
 No Champion replacement, feature-contract change, threshold change, automatic promotion, or unnecessary infrastructure change was identified during Step 25.
 Step 25 is an audit/documentation closeout activity; it does not expand the previously verified E2E scope.
+
+## ADDENDUM — 2026-10-09: KAFKA PAYLOAD CONTRACT CLARIFICATION
+
+**Finding: INCONSISTENT — the seven-field Kafka payload claim is unsupported by the evidence reviewed and likely inaccurate.**
+
+The Kafka producer at parent commit `7a863f1` defines and validates five payload fields: `TRANSACTION_ID`, `TX_DATETIME`, `CUSTOMER_ID`, `TERMINAL_ID`, and `TX_AMOUNT`.
+
+The FastAPI request model inspected at parent commit 7a863f1 defines the same five fields and rejects additional fields. The inspected online inference workflow derives time-based features from `TX_DATETIME` and calculates behavioral features using transaction history strictly earlier than the current transaction.
+
+These findings conflict with Step25's seven-field description, which includes `TX_TIME_SECONDS` and `TX_TIME_DAYS`. The original Step8 evidence or tests supporting a seven-field Kafka contract have not been located. Therefore, we cannot conclude that a seven-field contract never existed.
+
+The additional Git check showing that commit `0f09080` added `ingestion/simulated_api.py` does not establish that `TX_TIME_SECONDS` or `TX_TIME_DAYS` were required Kafka payload fields.
+
+**Scope and safeguards:** This addendum corrects the documented finding based on the evidence reviewed. It does not invalidate Step24's recorded Kafka-to-inference-to-storage verification, establish live S3-to-Kafka integration, or claim that a seven-field contract never existed. No implementation changes or Kafka/S3 reruns were performed for this correction. No changes were made to the producer, consumer, FastAPI, Feast, approved features, frozen RF-300 Champion, or threshold 0.65.
