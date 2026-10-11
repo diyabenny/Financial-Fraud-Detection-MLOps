@@ -3,7 +3,9 @@ Evaluate the Step 17 RF300 candidate on the fixed Apr 25–30 validation set.
 This step evaluates only; it does not retrain or promote the Champion.
 """
 
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -75,7 +77,8 @@ EXPECTED_FRAUD_COUNT = 526
 CHAMPION_IDENTITY = "RF_Balanced_300_None_1"
 CANDIDATE_IDENTITY = "RF300_STEP17_CANDIDATE"
 
-# Step 17 MLflow run ID recorded for reference; direct artifact provenance is unverified.
+# Step 17 MLflow run ID recorded for reference;
+# direct artifact provenance is unverified.
 STEP17_MLFLOW_RUN_ID = "ca4b5285656c4906a01502115774347d"
 
 EXPECTED_FEATURES = [
@@ -127,23 +130,33 @@ def validate_contract():
         raise ValueError("Unexpected Step 18 evaluation dataset.")
 
     if CANDIDATE_ARTIFACT == CHAMPION_ARTIFACT:
-        raise ValueError("Candidate artifact must differ from Champion artifact.")
+        raise ValueError(
+            "Candidate artifact must differ from Champion artifact."
+        )
 
     if not CANDIDATE_ARTIFACT.is_relative_to(
         PROJECT_ROOT / "artifacts" / "candidates"
     ):
-        raise ValueError("Candidate artifact is outside the candidate directory.")
+        raise ValueError(
+            "Candidate artifact is outside the candidate directory."
+        )
 
     if not CHAMPION_ARTIFACT.is_relative_to(
         PROJECT_ROOT / "artifacts" / "rf300_champion"
     ):
-        raise ValueError("Champion artifact is outside the Champion directory.")
+        raise ValueError(
+            "Champion artifact is outside the Champion directory."
+        )
 
     if CANDIDATE_IDENTITY == CHAMPION_IDENTITY:
-        raise ValueError("Candidate and Champion identities must differ.")
+        raise ValueError(
+            "Candidate and Champion identities must differ."
+        )
 
     if EXPECTED_FEATURES != MODEL_FEATURES:
-        raise ValueError("Step 18 features do not match MODEL_FEATURES.")
+        raise ValueError(
+            "Step 18 features do not match MODEL_FEATURES."
+        )
 
     if THRESHOLD != 0.65:
         raise ValueError("Step 18 threshold must remain 0.65.")
@@ -172,7 +185,8 @@ def load_candidate_model():
 
     if getattr(model, "n_features_in_", None) != len(EXPECTED_FEATURES):
         raise ValueError(
-            "Candidate model does not contain the expected number of features."
+            "Candidate model does not contain the expected "
+            "number of features."
         )
 
     for parameter, expected_value in EXPECTED_RF_PARAMETERS.items():
@@ -228,12 +242,110 @@ def calculate_metrics(labels, probabilities):
     return metrics, predictions
 
 
-def main():
-    # Never overwrite previously generated rerun evidence.
-    existing_outputs = [path for path in (METRICS_FILE, PREDICTIONS_FILE) if path.exists()]
+def write_evidence_safely(evidence_text, prediction_output):
+    """
+    Prepare both evidence files before publication.
+
+    Existing evidence is never intentionally overwritten or deleted.
+    Rollback and temporary-file cleanup are best effort, not atomic.
+    """
+
+    EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
+
+    existing_outputs = [
+        path
+        for path in (METRICS_FILE, PREDICTIONS_FILE)
+        if path.exists()
+    ]
+
     if existing_outputs:
         paths = ", ".join(str(path) for path in existing_outputs)
-        raise FileExistsError(f"Refusing to overwrite existing Step 18 evidence file(s): {paths}")
+        raise FileExistsError(
+            "Refusing to overwrite existing Step 18 evidence "
+            f"file(s): {paths}"
+        )
+
+    temporary_paths = []
+    published_paths = []
+
+    try:
+        # Prepare the complete metrics file.
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=EVIDENCE_DIR,
+            prefix=".step18_metrics_",
+            suffix=".tmp",
+            delete=False,
+        ) as metrics_temp:
+            # Register immediately so cleanup knows the path if writing fails.
+            temporary_paths.append(Path(metrics_temp.name))
+            metrics_temp.write(evidence_text)
+
+        # Prepare the complete predictions file.
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=EVIDENCE_DIR,
+            prefix=".step18_predictions_",
+            suffix=".tmp",
+            delete=False,
+        ) as predictions_temp:
+            temporary_paths.append(Path(predictions_temp.name))
+            prediction_output.to_csv(
+                predictions_temp,
+                index=False,
+            )
+
+        # Exclusive publication: fail if either destination already exists.
+        # Both temporary files are in the same directory as the final files.
+        os.link(temporary_paths[0], METRICS_FILE)
+        published_paths.append(METRICS_FILE)
+
+        os.link(temporary_paths[1], PREDICTIONS_FILE)
+        published_paths.append(PREDICTIONS_FILE)
+
+    except Exception:
+        # Roll back only destinations recorded as published by this call.
+        # A rollback failure can leave partial evidence; report it explicitly.
+        for path in reversed(published_paths):
+            try:
+                path.unlink()
+            except OSError as cleanup_error:
+                print(
+                    "WARNING: Evidence rollback failed for "
+                    f"{path}: {cleanup_error}"
+                )
+
+        raise
+
+    finally:
+        # Remove only the unique temporary files created by this invocation.
+        for path in temporary_paths:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError as cleanup_error:
+                print(
+                    "WARNING: Temporary-file cleanup failed for "
+                    f"{path}: {cleanup_error}"
+                )
+
+
+def main():
+    # Refuse to overwrite previously generated evidence.
+    existing_outputs = [
+        path
+        for path in (METRICS_FILE, PREDICTIONS_FILE)
+        if path.exists()
+    ]
+
+    if existing_outputs:
+        paths = ", ".join(str(path) for path in existing_outputs)
+        raise FileExistsError(
+            "Refusing to overwrite existing Step 18 evidence "
+            f"file(s): {paths}"
+        )
 
     validate_contract()
 
@@ -257,16 +369,10 @@ def main():
     if TARGET not in evaluation_df.columns:
         raise ValueError(f"Missing target column: {TARGET}")
 
-    actual_fraud_count = int(evaluation_df[TARGET].sum())
+    if "TRANSACTION_ID" not in evaluation_df.columns:
+        raise ValueError("Missing TRANSACTION_ID column.")
 
-    print(f"Fraud count: {actual_fraud_count}")
-    print(f"Expected fraud count: {EXPECTED_FRAUD_COUNT}")
-
-    if actual_fraud_count != EXPECTED_FRAUD_COUNT:
-        raise ValueError(
-            f"Unexpected fraud count: {actual_fraud_count}"
-        )
-
+    # Check all required feature columns before selecting them.
     missing_features = [
         feature
         for feature in EXPECTED_FEATURES
@@ -276,6 +382,42 @@ def main():
     if missing_features:
         raise ValueError(
             f"Missing expected features: {missing_features}"
+        )
+
+    # Reject missing feature values before inference.
+    missing_feature_values = (
+        evaluation_df[EXPECTED_FEATURES].isnull().sum()
+    )
+
+    if missing_feature_values.any():
+        raise ValueError(
+            "Missing values found in approved features: "
+            f"{missing_feature_values[missing_feature_values > 0].to_dict()}"
+        )
+
+    # Reject missing targets before conversion.
+    if evaluation_df[TARGET].isnull().any():
+        raise ValueError("Missing TX_FRAUD values found.")
+
+    # Reject non-binary targets before conversion and metrics.
+    invalid_target_values = (
+        set(evaluation_df[TARGET].unique()) - {0, 1}
+    )
+
+    if invalid_target_values:
+        raise ValueError(
+            "Non-binary TX_FRAUD values found: "
+            f"{sorted(invalid_target_values)}"
+        )
+
+    actual_fraud_count = int(evaluation_df[TARGET].sum())
+
+    print(f"Fraud count: {actual_fraud_count}")
+    print(f"Expected fraud count: {EXPECTED_FRAUD_COUNT}")
+
+    if actual_fraud_count != EXPECTED_FRAUD_COUNT:
+        raise ValueError(
+            f"Unexpected fraud count: {actual_fraud_count}"
         )
 
     if evaluation_df["TRANSACTION_ID"].duplicated().any():
@@ -302,7 +444,7 @@ def main():
 
     print()
     print("Historical RF300 Champion benchmark")
-    print("------------------------------------")
+    print("-----------------------------------")
 
     for key, value in HISTORICAL_CHAMPION_BENCHMARK.items():
         print(f"{key}: {value}")
@@ -327,22 +469,24 @@ def main():
     differences = {}
 
     for key in metric_keys:
-        candidate_value = candidate_metrics[key]
-        benchmark_value = HISTORICAL_CHAMPION_BENCHMARK[key]
+        difference = (
+            candidate_metrics[key]
+            - HISTORICAL_CHAMPION_BENCHMARK[key]
+        )
 
-        difference = candidate_value - benchmark_value
         differences[key] = difference
-
         print(f"{key}: {difference}")
-
-    EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
 
     evidence_lines = [
         "STEP 18 CANDIDATE EVALUATION",
         "============================",
         "",
         f"Candidate identity: {CANDIDATE_IDENTITY}",
-        f"Step 17 MLflow run ID (recorded reference; direct candidate-artifact provenance unverified): {STEP17_MLFLOW_RUN_ID}",
+        (
+            "Step 17 MLflow run ID (recorded reference; "
+            "direct candidate-artifact provenance unverified): "
+            f"{STEP17_MLFLOW_RUN_ID}"
+        ),
         f"Candidate artifact: {CANDIDATE_ARTIFACT}",
         f"Champion artifact protected: {CHAMPION_ARTIFACT}",
         f"Evaluation dataset: {EVALUATION_DATASET}",
@@ -385,11 +529,6 @@ def main():
         ]
     )
 
-    METRICS_FILE.write_text(
-        "\n".join(evidence_lines),
-        encoding="utf-8",
-    )
-
     prediction_output = evaluation_df[
         ["TRANSACTION_ID", TARGET]
     ].copy()
@@ -397,9 +536,9 @@ def main():
     prediction_output["candidate_probability"] = probabilities
     prediction_output["candidate_prediction"] = predictions
 
-    prediction_output.to_csv(
-        PREDICTIONS_FILE,
-        index=False,
+    write_evidence_safely(
+        "\n".join(evidence_lines) + "\n",
+        prediction_output,
     )
 
     print()
@@ -407,7 +546,11 @@ def main():
     print(f"Metrics: {METRICS_FILE}")
     print(f"Predictions: {PREDICTIONS_FILE}")
     print()
-    print(f"Step 17 MLflow run ID (recorded reference; direct candidate-artifact provenance unverified): {STEP17_MLFLOW_RUN_ID}")
+    print(
+        "Step 17 MLflow run ID (recorded reference; "
+        "direct candidate-artifact provenance unverified): "
+        f"{STEP17_MLFLOW_RUN_ID}"
+    )
     print("Candidate only: no promotion performed.")
     print("Champion artifact protected.")
 
