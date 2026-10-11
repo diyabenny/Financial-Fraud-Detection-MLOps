@@ -799,3 +799,137 @@ It does not by itself constitute:
 Those activities remain pending until they are actually implemented and verified.
 
 The existing Phase 4 candidate evidence remains the source of record for the documented candidate evaluation.
+
+---
+
+## 21. Isolated Step 18 Candidate Rerun — 10 October 2026
+
+### 21.1 Purpose and Scope
+
+An isolated rerun of the Step 18 candidate evaluation was performed using the existing RF300 Step 17 candidate artifact and the approved April 25–30 evaluation dataset.
+
+The isolated evaluator was:
+
+```text
+scripts\evaluate_candidate_step18_isolated_20261010.py
+```
+
+The original evaluator, `scripts\evaluate_candidate_step18.py`, was preserved. The isolated copy was configured to write its evidence to a separate output directory. No retraining or Champion promotion was performed.
+
+The evaluation used the existing ten-feature configuration and operating threshold of `0.65`.
+
+### 21.2 Evaluation Dataset
+
+```text
+data\phase4\april_25_30_evaluation_features.csv
+```
+
+| Dataset property | Value |
+|---|---:|
+| Evaluation rows | 57,767 |
+| Fraud cases | 526 |
+| Legitimate transactions | 57,241 |
+| Operating threshold | 0.65 |
+
+### 21.3 Candidate Metrics
+
+Candidate identity: `RF300_STEP17_CANDIDATE`
+
+| Metric | Isolated candidate | Historical RF300 Champion benchmark |
+|---|---:|---:|
+| PR-AUC | 0.2571243664 | 0.2574410304 |
+| ROC-AUC | 0.6330922031 | 0.6370331816 |
+| Precision | 1.000000 | 1.000000 |
+| Recall | 0.2319391635 | 0.2338403042 |
+| F1 | 0.3765432099 | 0.3790446841 |
+| False-positive rate | 0 | 0 |
+| True positives | 122 | 123 |
+| False positives | 0 | 0 |
+| True negatives | 57,241 | 57,241 |
+| False negatives | 404 | 403 |
+
+The candidate was slightly below the historical RF300 Champion benchmark on PR-AUC, ROC-AUC, recall, and F1. At threshold `0.65`, it detected one fewer fraud case and produced one additional false negative. Precision and false-positive rate were unchanged.
+
+These results document the isolated candidate evaluation only. **No promotion decision was made**, and the frozen Champion remains unchanged.
+
+### 21.4 Evidence Files
+
+The isolated evaluator reported writing the following files:
+
+```text
+reports\phase4\step18_candidate_evaluation_rerun_20261010\candidate_evaluation_metrics.txt
+reports\phase4\step18_candidate_evaluation_rerun_20261010\candidate_predictions.csv
+```
+
+The saved metrics file was inspected and matched the reported candidate metrics and historical benchmark.
+
+The predictions CSV was confirmed to exist. Its header is:
+
+```text
+TRANSACTION_ID,TX_FRAUD,candidate_probability,candidate_prediction
+```
+
+The first five lines were inspected. A full-row validation of the predictions CSV is not claimed here.
+
+The following manifest was checked for before editing:
+
+```text
+reports\phase4\step18_candidate_evaluation_rerun_20261010\evaluation_manifest.txt
+```
+
+**Status: NOT FOUND.** No claim is made that this manifest exists or was created.
+
+### 21.5 Protected-File Integrity Verification
+
+After the isolated evaluation, all five protected-file SHA-256 checksums were rechecked against their recorded baselines. All five matched.
+
+| Protected file | Verification result |
+|---|---|
+| `data\phase4\april_25_30_evaluation_features.csv` | PASS |
+| `artifacts\rf300_champion\model.skops` | PASS |
+| `artifacts\candidates\rf300_candidate\model.skops` | PASS |
+| `reports\phase4\step18_candidate_evaluation\candidate_evaluation_metrics.txt` | PASS |
+| `reports\phase4\step18_candidate_evaluation\candidate_predictions.csv` | PASS |
+
+Recorded SHA-256 values:
+
+```text
+Evaluation dataset:
+22b485eafab1e343df2e9cc691a35af68fab778e5c0bfa8a2b306fccfc48b5c3
+
+Frozen Champion artifact:
+a28e5e10dbe7478f1f446b8fd55fc9457984f0f3b719371bb0934e63fa58ed83
+
+Candidate artifact:
+ad2e9d7e598558fe660137ce4320a52e83e10b2b228c831d4a308e4e4fccac32
+
+Original Step 18 metrics:
+f7e31cc176612d91ca2620df257dea5dcfbd456376786eca43b4178447e75a02
+
+Original Step 18 predictions:
+b7c01c308a089d922eed548e159aac207a5560a79e33d7e3436f713cdc31b541
+```
+
+This verification establishes that the five protected files matched their recorded reference hashes. The original Step 18 evidence and frozen Champion were preserved.
+
+### 21.6 MLflow Provenance Limitation
+
+The isolated metrics file records the following Step 17 MLflow run ID:
+
+```text
+ca4b5285656c4906a01502115774347d
+```
+
+However, the direct provenance link between that MLflow run and the candidate artifact has not been independently established.
+
+**Candidate-to-MLflow provenance: NEEDS VERIFICATION.**
+
+The recorded run ID is reported for traceability only and is not presented as proof that the candidate artifact was produced by that run.
+
+### 21.7 Decision and Change Boundary
+
+The isolated rerun was an evaluation-only activity. No retraining or candidate promotion was performed. The frozen Champion, candidate artifact, evaluation dataset, original evaluator, and original Step 18 evidence were preserved.
+
+This section records the rerun evidence and does not reopen the Champion decision or authorize changes to the model, features, preprocessing, threshold, MLflow tracking store, or deployment configuration.
+
+The documentation change does not authorize a commit or push.
