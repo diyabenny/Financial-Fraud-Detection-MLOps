@@ -1,0 +1,28 @@
+============================================================
+Online Feature Automation
+============================================================
+
+Test transaction:
+TRANSACTION_ID                    422
+TX_DATETIME       2018-04-01 03:17:55
+CUSTOMER_ID                      2808
+TERMINAL_ID                      8275
+TX_AMOUNT                       86.85
+
+Historical transactions available: 422
+
+Feature validation: PASS
+Feast push: PASS
+
+Retrieved features:
+ TRANSACTION_ID  TERMINAL_AVG_AMOUNT_7D  TX_IS_WEEKEND  TX_HOUR  CUSTOMER_TX_COUNT_7D  TX_DAY_OF_WEEK  TERMINAL_TX_COUNT_1D  AMOUNT_LOG  TERMINAL_TX_COUNT_7D  TX_AMOUNT  CUSTOMER_TX_COUNT_1D
+            422               24.860001              1        3                   1.0               6                   1.0    4.475631                   1.0  86.849998                   1.0
+
+Online retrieval: PASS
+
+Champion probability: 0.000000
+Champion threshold: 0.65
+Champion prediction: 0
+============================================================
+Online feature automation completed successfully.
+============================================================

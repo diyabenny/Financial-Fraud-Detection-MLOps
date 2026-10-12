@@ -1,0 +1,91 @@
+{
+  "experiment": "financial_fraud_detection_phase4_controlled_xgboost",
+  "git_commit": "0a35d56426c4f546a08ed15205f2e08b098feaea",
+  "train_dataset": "data\\phase3\\train_feast_features.csv",
+  "evaluation_dataset": "data\\phase4\\april_25_30_evaluation_features.csv",
+  "dvc_status": {
+    "return_code": 0,
+    "stdout": "Data and pipelines are up to date.",
+    "stderr": ""
+  },
+  "train_dataset_dvc_tracking": {
+    "dataset": "data\\phase3\\train_feast_features.csv",
+    "pointer": "data\\phase3\\train_feast_features.csv.dvc",
+    "exists": false
+  },
+  "evaluation_dataset_dvc_tracking": {
+    "dataset": "data\\phase4\\april_25_30_evaluation_features.csv",
+    "pointer": "data\\phase4\\april_25_30_evaluation_features.csv.dvc",
+    "exists": false
+  },
+  "features": [
+    "TX_AMOUNT",
+    "AMOUNT_LOG",
+    "TX_HOUR",
+    "TX_DAY_OF_WEEK",
+    "TX_IS_WEEKEND",
+    "TERMINAL_TX_COUNT_1D",
+    "TERMINAL_TX_COUNT_7D",
+    "TERMINAL_AVG_AMOUNT_7D",
+    "CUSTOMER_TX_COUNT_1D",
+    "CUSTOMER_TX_COUNT_7D"
+  ],
+  "target": "TX_FRAUD",
+  "preprocessing": "StandardScaler inside sklearn Pipeline",
+  "model": "XGBoost",
+  "n_estimators": 300,
+  "max_depth": 6,
+  "learning_rate": 0.05,
+  "objective": "binary:logistic",
+  "random_state": 42,
+  "n_jobs": -1,
+  "eval_metric": "logloss",
+  "stage1": {
+    "rows": 114978,
+    "legitimate": 114610,
+    "fraud": 368,
+    "scale_pos_weight": 311.4402173913044,
+    "date_range": "2018-04-01 to 2018-04-12"
+  },
+  "threshold_selection": {
+    "rows": 57525,
+    "legitimate": 57176,
+    "fraud": 349,
+    "date_range": "2018-04-13 to 2018-04-18",
+    "selection_method": "maximum F1",
+    "selected_threshold": 0.86
+  },
+  "stage2": {
+    "rows": 230295,
+    "legitimate": 229119,
+    "fraud": 1176,
+    "scale_pos_weight": 194.82908163265307,
+    "date_range": "2018-04-01 to 2018-04-24",
+    "training_evaluation_id_overlap": 0
+  },
+  "evaluation": {
+    "rows": 57767,
+    "legitimate": 57241,
+    "fraud": 526,
+    "date_range": "2018-04-25 to 2018-04-30",
+    "metrics": {
+      "threshold": 0.86,
+      "recall": 0.2338403041825095,
+      "precision": 0.48046875,
+      "f1": 0.3145780051150895,
+      "pr_auc": 0.14109921100493,
+      "roc_auc": 0.6286846661201592,
+      "accuracy": 0.9907213460972527,
+      "fpr": 0.0023235093726524693,
+      "tp": 123,
+      "fp": 133,
+      "tn": 57108,
+      "fn": 403
+    }
+  },
+  "id_overlap_checks": {
+    "stage1_threshold": 0,
+    "stage2_evaluation": 0
+  },
+  "may_usage": "Not used"
+}

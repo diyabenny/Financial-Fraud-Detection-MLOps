@@ -1,0 +1,53 @@
+STEP 18 CANDIDATE EVALUATION
+============================
+
+Candidate identity: RF300_STEP17_CANDIDATE
+Step 17 MLflow run ID: ca4b5285656c4906a01502115774347d
+Candidate artifact: C:\Users\HP\OneDrive\Documents\financial_fraud_detection_p1\Financial-Fraud-Detection-MLOps\artifacts\candidates\rf300_candidate\model.skops
+Champion artifact protected: C:\Users\HP\OneDrive\Documents\financial_fraud_detection_p1\Financial-Fraud-Detection-MLOps\artifacts\rf300_champion\model.skops
+Evaluation dataset: C:\Users\HP\OneDrive\Documents\financial_fraud_detection_p1\Financial-Fraud-Detection-MLOps\data\phase4\april_25_30_evaluation_features.csv
+Evaluation rows: 57767
+Fraud count: 526
+Threshold: 0.65
+
+Candidate metrics:
+threshold: 0.65
+pr_auc: 0.2571243663988901
+roc_auc: 0.6330922031145347
+precision: 1.0
+recall: 0.23193916349809887
+f1: 0.3765432098765432
+fpr: 0.0
+true_positives: 122
+false_positives: 0
+true_negatives: 57241
+false_negatives: 404
+
+Historical RF300 Champion benchmark:
+threshold: 0.65
+pr_auc: 0.2574410304
+roc_auc: 0.6370331816
+precision: 1.0
+recall: 0.2338403042
+f1: 0.3790446841
+fpr: 0.0
+true_positives: 123
+false_positives: 0
+true_negatives: 57241
+false_negatives: 403
+
+Metric differences:
+pr_auc: -0.000316664001109912
+roc_auc: -0.003940978485465263
+precision: 0.0
+recall: -0.0019011407019011162
+f1: -0.0025014742234567566
+fpr: 0.0
+true_positives: -1
+false_positives: 0
+true_negatives: 0
+false_negatives: 1
+
+Candidate only: no promotion performed.
+Champion artifact was not modified.
+No retraining performed during Step 18.
