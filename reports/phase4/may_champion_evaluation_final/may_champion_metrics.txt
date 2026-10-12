@@ -1,0 +1,33 @@
+MAY FROZEN CHAMPION EVALUATION
+============================================================
+
+May transactions: 182429
+May fraud transactions: 1633
+Model: RandomForestClassifier
+Threshold: 0.65
+Feature order:
+  - TX_AMOUNT
+  - AMOUNT_LOG
+  - TX_HOUR
+  - TX_DAY_OF_WEEK
+  - TX_IS_WEEKEND
+  - TERMINAL_TX_COUNT_1D
+  - TERMINAL_TX_COUNT_7D
+  - TERMINAL_AVG_AMOUNT_7D
+  - CUSTOMER_TX_COUNT_1D
+  - CUSTOMER_TX_COUNT_7D
+
+Metrics
+------------------------------------------------------------
+threshold: 0.65
+recall: 0.23759951010410288
+precision: 0.9923273657289002
+f1: 0.383399209486166
+pr_auc: 0.2553562939648593
+roc_auc: 0.6263909435835407
+accuracy: 0.9931589823986318
+fpr: 1.6593287462111994e-05
+true_positives: 388
+false_positives: 3
+true_negatives: 180793
+false_negatives: 1245
