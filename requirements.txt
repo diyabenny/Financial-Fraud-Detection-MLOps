@@ -1,1 +1,17 @@
 boto3
+python-dotenv>=1.0.0
+pandas==2.3.3
+numpy==2.5.2
+scikit-learn==1.9.0
+matplotlib
+dvc[s3]
+xgboost-cpu==3.4.1
+imbalanced-learn==0.14.2
+feast==0.66.0
+pyarrow==25.0.1
+mlflow==3.16.0
+fastapi==0.141.1
+uvicorn==0.53.0
+pydantic==2.13.5
+skops==0.15.0
+confluent-kafka==2.16.0

@@ -1,0 +1,599 @@
+STEP 22 REPRODUCIBILITY VERIFICATION
+=====================================
+
+Status: IN PROGRESS
+Checkpoint 11: EVIDENCE RECORD
+
+Purpose
+-------
+
+Step 22 verifies whether another developer can reproduce the documented
+implemented lifecycle using the repository, existing verified evidence,
+documented dependencies, and controlled reproduction where appropriate.
+
+Step 22 does not require rerunning every previous workflow. Existing verified
+evidence is reused where it is sufficient. Stateful systems are not mutated
+unnecessarily.
+
+
+BASELINE
+--------
+
+Branch:
+diya
+
+Verified repository baseline:
+7659a1b
+
+Verified at Checkpoint 0:
+- HEAD = 7659a1b
+- origin/diya = 7659a1b
+- origin/common-check = 7659a1b
+
+Initial Git state contained only previously known intentional untracked
+runtime/local artifacts.
+
+
+REPRODUCIBILITY CLASSIFICATION
+------------------------------
+
+The Step 22 workflow uses the following classifications:
+
+1. Freshly reproduced
+2. Existing verified evidence sufficient
+3. External/local dependency — document it
+4. Not required for Step 22
+5. Genuine reproducibility gap — minimum change only if required
+
+
+CHECKPOINT 1 — REPOSITORY INSPECTION
+------------------------------------
+
+Repository inspection confirmed the implemented project components include:
+
+- ingestion/
+  - kafka_producer.py
+  - kafka_consumer.py
+  - simulated_api.py
+  - upload_to_s3.py
+- feast_repo/fraud_features/feature_repo/
+- src/
+  - api.py
+  - prediction_storage.py
+- scripts/
+  - monitoring, drift, retraining, candidate, and evaluation scripts
+- tests/
+  - unittest-based project tests
+- local-kafka/compose.yaml
+- requirements.txt
+- Dockerfile
+
+The project test framework is unittest.
+
+
+CHECKPOINT 2 — REPRODUCIBILITY SCOPE
+------------------------------------
+
+The implemented lifecycle was classified component-by-component.
+
+Existing verified evidence was reused where sufficient.
+
+No unnecessary rerun of Steps 16–19 was performed because those steps already
+have verified evidence.
+
+Docker was not treated as a complete standalone Champion-inference
+reproduction path because the Docker build context excludes the local Champion
+artifact.
+
+S3 is an external dependency using boto3 and the project .env bucket
+configuration.
+
+Kafka is a local/stateful dependency and requires an available broker.
+
+FastAPI is a separate prediction API path and is not claimed to be connected
+directly to the Kafka pipeline.
+
+Step 24 remains the authority for final integrated live E2E verification.
+
+
+CHECKPOINT 3 — ENVIRONMENT AND DEPENDENCIES
+-------------------------------------------
+
+Verified environment:
+
+Python:
+3.13.9
+
+pip:
+25.2
+
+pip check:
+No broken requirements found.
+
+requirements.txt contains the project's declared dependencies.
+
+Important reproducibility gap:
+
+The Kafka implementation imports confluent_kafka, but confluent-kafka is not
+declared in requirements.txt and is not installed in the current environment.
+
+No approved/project-established confluent-kafka version was found in the
+repository, Git history, dependency manifests, artifact requirements, or
+available local evidence.
+
+Decision:
+
+- Do not install an arbitrary version.
+- Do not modify requirements.txt during Step 22.
+- Document confluent-kafka version as UNDETERMINED.
+- Treat Kafka dependency/version as an external/local reproducibility
+  dependency.
+
+
+CHECKPOINT 4 — CONFIGURATION
+----------------------------
+
+Feast configuration:
+
+project: fraud_features
+registry: data/registry.db
+provider: local
+online_store: sqlite
+online_store path: data/online_store.db
+entity_key_serialization_version: 3
+auth: no_auth
+
+Kafka producer:
+
+Broker:
+localhost:9092
+
+Topic:
+fraud-transactions
+
+Kafka consumer:
+
+Broker:
+127.0.0.1:9092
+
+Consumer group:
+fraud-inference-group
+
+Champion inference configuration:
+
+Model:
+artifacts/rf300_champion/model.skops
+
+Threshold:
+0.65
+
+FastAPI:
+
+Host:
+0.0.0.0
+
+Port:
+8000
+
+S3 configuration is externalized through .env and boto3.
+
+
+CHECKPOINT 5 — DATA AND ARTIFACTS
+---------------------------------
+
+Verified:
+
+- Phase 3 combined training features are Git-tracked.
+- Phase 3 combined validation features are Git-tracked.
+- Phase 3 source feature datasets include DVC tracking where applicable.
+- DVC status was clean/up to date.
+- DVC remote is configured for the project S3 storage.
+
+Step 18 evaluation dataset:
+
+data/phase4/april_25_30_evaluation_features.csv
+
+This file exists locally but is intentionally Git-ignored and is not a DVC
+stage/output.
+
+Champion artifact:
+
+artifacts/rf300_champion/model.skops
+
+The Champion artifact exists locally and is intentionally not committed.
+
+Verified Champion SHA-256:
+
+a28e5e10dbe7478f1f446b8fd55fc9457984f0f3b719371bb0934e63fa58ed83
+
+Candidate artifact:
+
+artifacts/candidates/rf300_candidate/model.skops
+
+The Step 17/18 candidate artifact is not currently available locally.
+
+Historical Step 17 MLflow run:
+
+ca4b5285656c4906a01502115774347d
+
+The local MLflow store cannot currently resolve this historical run.
+
+Decision:
+
+Do not regenerate the candidate artifact.
+Do not retrain the candidate.
+Do not reconstruct the historical MLflow run.
+
+Step 18 Git-tracked evidence remains the reproducibility/provenance record.
+
+
+CHECKPOINT 6 — FEAST REPRODUCIBILITY
+------------------------------------
+
+Feast SDK version:
+
+0.66.0
+
+Feast registry inspection confirmed:
+
+Project:
+fraud_features
+
+Entity:
+transaction
+
+Join key:
+TRANSACTION_ID
+
+FeatureView:
+fraud_features
+
+The FeatureView contains exactly the 10 approved Champion features.
+
+Online store:
+
+data/online_store.db
+
+Existing Step 13 inference code uses the configured Feast repository path.
+
+Fresh read-only Feast retrieval for transaction 288062 succeeded.
+
+Retrieved features were successfully passed to the Champion inference
+contract.
+
+No Feast push was performed during Step 22 controlled reproduction because
+that would unnecessarily mutate runtime state.
+
+
+CHECKPOINT 7 — KAFKA REPRODUCIBILITY
+------------------------------------
+
+Kafka implementation and local infrastructure are present in the repository.
+
+local-kafka/compose.yaml specifies:
+
+Kafka image:
+apache/kafka:4.3.0
+
+Container:
+fraud-local-kafka
+
+Host broker:
+localhost:9092
+
+The producer and consumer use:
+
+Topic:
+fraud-transactions
+
+Consumer group:
+fraud-inference-group
+
+The project Kafka tests are unittest-based and use mocked/offline behavior
+for validation.
+
+Live Kafka reproduction was not performed because:
+
+- Docker Desktop Linux engine was unavailable during verification.
+- confluent-kafka is not installed.
+- The approved confluent-kafka version is unresolved.
+- Kafka is stateful and Step 22 does not require unnecessary topic creation,
+  publishing, consuming, or offset modification.
+
+Classification:
+
+Partially reproducible from repository evidence.
+
+Live broker availability and confluent-kafka dependency/version remain
+external/local reproducibility dependencies.
+
+Full live Kafka E2E verification remains Step 24 scope.
+
+
+CHECKPOINT 8 — INFERENCE AND FASTAPI
+------------------------------------
+
+FastAPI implementation is a thin API layer over the existing Step 13
+inference workflow.
+
+Verified:
+
+- Five-field transaction request schema.
+- Unexpected fields are rejected.
+- Startup initializes prediction storage and loads the required history and
+  Champion.
+- /predict delegates to the existing inference workflow.
+- Prediction response contains probability, prediction, and stored_prediction.
+- Startup and prediction failures have explicit HTTP error handling.
+
+FastAPI application import was freshly verified successfully.
+
+Champion path:
+
+artifacts/rf300_champion/model.skops
+
+Threshold:
+
+0.65
+
+FastAPI is not claimed to be directly connected to the Kafka pipeline.
+
+Existing Step 13/14 runtime evidence is reused for the state-changing
+prediction/storage path.
+
+
+CHECKPOINT 9 — MONITORING, DRIFT, AND RETRAINING
+------------------------------------------------
+
+Step 16 monitoring lifecycle was previously verified.
+
+Feature drift detection uses:
+
+- exact 10 approved features
+- deterministic feature derivation
+- reference quantile bins
+- PSI calculation
+- drift threshold PSI > 0.25
+
+Step 16C retraining trigger:
+
+If drift is detected:
+REQUEST_STEP_17_RETRAINING
+
+If drift is not detected:
+KEEP_RF300_CHAMPION
+
+The trigger does not itself train, evaluate, promote, or replace the
+Champion.
+
+Existing Step 17/18/19 evidence was reused.
+
+Step 19 promotion eligibility remains:
+
+UNDETERMINED
+
+No authorized numerical promotion/degradation threshold was identified.
+
+The Champion remains protected.
+
+
+CHECKPOINT 10 — MINIMAL CONTROLLED REPRODUCTION
+-----------------------------------------------
+
+Freshly reproduced:
+
+1. Step 16C drift/retraining decision
+
+Overall drift detected:
+False
+
+Retraining requested:
+False
+
+Action:
+KEEP_RF300_CHAMPION
+
+2. Frozen Champion loading
+
+Model:
+RandomForestClassifier
+
+n_estimators:
+300
+
+max_depth:
+None
+
+min_samples_leaf:
+1
+
+3. Inference contract
+
+Approved feature count:
+10
+
+Threshold:
+0.65
+
+4. Feast online retrieval
+
+Transaction:
+288062
+
+Result:
+PASS
+
+5. RF-300 inference from the retrieved Feast features
+
+Result:
+PASS
+
+Probability:
+0.0
+
+Prediction:
+0
+
+The state-changing process_new_transaction() path was intentionally not
+rerun because it would push data to Feast and write prediction storage.
+Existing Step 13/14 evidence already covers that state-changing path.
+
+No retraining was performed.
+
+No promotion was performed.
+
+No Champion modification was performed.
+
+No Kafka message was published or consumed.
+
+No Kafka state or offsets were modified.
+
+No unexpected Git changes were created.
+
+
+REPRODUCIBILITY GAPS AND EXTERNAL DEPENDENCIES
+-----------------------------------------------
+
+The following are documented rather than artificially repaired:
+
+1. confluent-kafka dependency/version is not established by the repository.
+2. Live Kafka broker availability depends on the local Docker/Kafka
+   environment.
+3. Step 17 candidate artifact is not currently available locally.
+4. Historical Step 17 MLflow run is not resolvable from the current local
+   MLflow store.
+5. Step 18 evaluation dataset is locally available but intentionally
+   Git-ignored.
+6. Docker is not a complete standalone Champion-inference reproduction path
+   because the Docker build context excludes the local Champion artifact.
+7. FastAPI is a separate API path and is not claimed as part of the live
+   Kafka E2E chain.
+
+
+CHAMPION PROTECTION
+-------------------
+
+Champion identity:
+
+RF_Balanced_300_None_1
+
+Threshold:
+
+0.65
+
+Approved features:
+
+TX_AMOUNT
+AMOUNT_LOG
+TX_HOUR
+TX_DAY_OF_WEEK
+TX_IS_WEEKEND
+TERMINAL_TX_COUNT_1D
+TERMINAL_TX_COUNT_7D
+TERMINAL_AVG_AMOUNT_7D
+CUSTOMER_TX_COUNT_1D
+CUSTOMER_TX_COUNT_7D
+
+Verified Champion SHA-256:
+
+a28e5e10dbe7478f1f446b8fd55fc9457984f0f3b719371bb0934e63fa58ed83
+
+During Step 22:
+
+- Champion was not modified.
+- Threshold was not changed.
+- Approved features were not changed.
+- No candidate was promoted.
+- No retraining was triggered.
+- No unnecessary Feast mutation was performed.
+- No Kafka state was altered.
+
+
+STEP 22 SCOPE BOUNDARY
+----------------------
+
+Step 22 establishes reproducibility of the documented implemented lifecycle
+and selected deterministic components.
+
+It does NOT establish the complete live integrated chain:
+
+S3
+→ Kafka
+→ consumer
+→ validation
+→ feature calculation
+→ Feast
+→ RF-300
+→ threshold 0.65
+→ prediction storage
+
+The complete integrated live E2E chain remains Step 24 scope.
+
+Step 22 does not require fabrication of drift, forced retraining, candidate
+promotion, or Champion replacement.
+
+
+CURRENT STATUS
+--------------
+
+Checkpoint 0:
+VERIFIED
+
+Checkpoint 1:
+VERIFIED
+
+Checkpoint 2:
+VERIFIED
+
+Checkpoint 3:
+VERIFIED
+
+Checkpoint 4:
+VERIFIED
+
+Checkpoint 5:
+VERIFIED
+
+Checkpoint 6:
+VERIFIED
+
+Checkpoint 7:
+VERIFIED
+
+Checkpoint 8:
+VERIFIED
+
+Checkpoint 9:
+VERIFIED
+
+Checkpoint 10:
+VERIFIED
+
+
+REVIEW
+------
+
+Checkpoint 10 cross-check:
+
+Avani: APPROVED
+Swathi: APPROVED
+
+Checkpoint 11 evidence record:
+APPROVED
+
+Step 22 overall closure:
+
+- Checkpoint 12 — Avani cross-check: APPROVED
+- Checkpoint 13 — Git review: COMPLETED
+- Approved dependency: confluent-kafka==2.16.0
+- Kafka-related tests: 21/21 PASS
+
+POST-STEP 22 DEPENDENCY DECISION
+----------------------------------
+After Step 22, the team explicitly reviewed the unresolved confluent-kafka dependency.
+No exact project-established version was found in the existing repository evidence or history.
+The team explicitly approved the following version:
+confluent-kafka==2.16.0
+This version was selected by explicit team agreement, based on the version observed during Step 22 environment verification.
+The approval does not authorize any unrelated dependency, code, configuration, Champion, Feast, threshold, or Kafka-state changes.
+Approved next actions are limited to pinning this exact version, installing the same version, rerunning the blocked tests, reviewing the results, and reviewing the final Git diff/status before any commit.
