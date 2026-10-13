@@ -263,3 +263,5 @@ data/phase3/validation_feast_features.csv
 mlflow.db
 data/phase4/april_25_30_evaluation_features.csv
 mlruns/
+
+artifacts/rf300_champion/
